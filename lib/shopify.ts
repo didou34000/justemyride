@@ -30,6 +30,7 @@ export async function createCheckout(c: Config): Promise<string> {
   // La configuration voyage avec la ligne principale : elle apparaît dans la commande.
   const attributes = [
     { key: "Voiture", value: c.carName },
+    ...(c.source ? [{ key: "Modèle 3D", value: c.source }] : []),
     { key: "Couleur", value: c.paint === "origine" ? "D'origine" : `${c.paintName} (${c.paint})` },
     { key: "Finition", value: c.finish },
     { key: "Jantes", value: `${label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },

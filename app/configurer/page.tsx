@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
+import CarSearch from "@/components/CarSearch";
 
 export const metadata = { title: "Choisis ta voiture — JustMyRide" };
 
@@ -15,6 +16,8 @@ export default function GaragePage() {
           Tu choisis ici seulement le modèle de base. Jantes, échappement et couleur se règlent à l'étape suivante, sur
           ta miniature en 3D.
         </p>
+        <CarSearch />
+        <p className="eyebrow garage-sub">Prêtes à personnaliser</p>
         <div className="garage-grid">
           {cars.map((car) =>
             car.available ? (

@@ -62,6 +62,8 @@ export const caliperColors = [
 export type Config = {
   car: string; // slug
   carName: string;
+  /** Lien du modèle 3D de base quand il vient de Sketchfab (pour l'usine). */
+  source?: string;
   paint: string; // hex ou "origine"
   paintName: string;
   finish: string;

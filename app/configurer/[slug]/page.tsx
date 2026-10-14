@@ -18,7 +18,16 @@ export default async function CarPage({ params }: { params: Promise<{ slug: stri
   return (
     <main>
       <Nav link={{ href: "/configurer", label: "Changer de voiture" }} />
-      <Configurator3D car={car} />
+      <Configurator3D
+        model={{
+          key: car.slug,
+          name: `${car.make} ${car.model}`,
+          subtitle: car.years,
+          url: car.glb!,
+          lengthM: car.lengthM,
+          roles: car.roles,
+        }}
+      />
       <footer className="foot">© {new Date().getFullYear()} JustMyRide</footer>
     </main>
   );

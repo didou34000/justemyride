@@ -289,3 +289,20 @@ a.car-card:hover { border-color: #5a5a60; transform: translateY(-2px); }
   .garage-grid .car-card:first-child { grid-column: 1 / -1; }
   .car-card.soon .car-card-go { top: 8px; right: 8px; font-size: 10px; padding: 3px 8px; }
 }
+
+/* Recherche Sketchfab */
+.search { margin-bottom: 48px; }
+.search-input {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px 18px; font-size: 17px; outline: none; transition: border-color .15s;
+}
+.search-input:focus { border-color: #5a5a60; }
+.search-note { font-size: 12px; color: var(--muted); margin: 10px 2px 18px; }
+.garage-grid.results .car-card-body strong { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.noimg { aspect-ratio: 4/3; background: radial-gradient(ellipse at 50% 55%, #26262b 0%, #0d0d0f 75%); }
+.garage-sub { margin: 0 0 14px; }
+.credit { font-size: 11px; color: var(--muted); }
+.credit a { color: inherit; }
+.fix { padding: 20px 0 4px; border-bottom: 1px solid var(--line); }
+.fix .sub { margin-top: 0; }
+.viewer.picking { cursor: crosshair; outline: 1px dashed #6a6a70; }

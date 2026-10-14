@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import CarViewer from "./CarViewer";
-import type { Car } from "@/lib/cars";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import CarViewer, { type Caps, type ModelSource, type PickRole } from "./CarViewer";
 import {
   accessories,
   caliperColors,
@@ -18,10 +18,31 @@ import {
   type Option,
 } from "@/lib/options";
 
-export default function Configurator3D({ car }: { car: Car }) {
+export type ConfigModel = {
+  key: string;
+  name: string;
+  subtitle: string;
+  url: string;
+  zip?: boolean;
+  lengthM?: number;
+  roles?: ModelSource["roles"];
+  /** Modèle Sketchfab : crédit obligatoire + rôles devinés que le client peut corriger. */
+  credit?: { name: string; author: string; authorUrl?: string; licence: string; viewerUrl: string };
+};
+
+const pickLabels: Record<PickRole, string> = { paint: "Carrosserie", rims: "Jantes", calipers: "Étriers" };
+
+export default function Configurator3D({ model }: { model: ConfigModel }) {
+  const source = useMemo<ModelSource>(
+    () => ({ url: model.url, zip: model.zip, lengthM: model.lengthM, roles: model.roles }),
+    [model.url, model.zip, model.lengthM, model.roles]
+  );
+  const [caps, setCaps] = useState<Caps | null>(null);
+  const [pick, setPick] = useState<PickRole | null>(null);
   const [c, setC] = useState<Config>({
-    car: car.slug,
-    carName: `${car.make} ${car.model}`,
+    car: model.key,
+    carName: model.name,
+    source: model.credit?.viewerUrl,
     paint: ORIGINE,
     paintName: "D'origine",
     finish: "metal",
@@ -62,29 +83,66 @@ export default function Configurator3D({ car }: { car: Car }) {
     <section className="config">
       <div className="stage">
         <div className="stage-inner viewer-wrap">
-          <CarViewer car={car} config={c} />
+          <CarViewer source={source} config={c} pick={pick} onCaps={setCaps} onPicked={() => setPick(null)} />
           <div className="stage-meta">
             <span>
-              {car.make} {car.model} · {car.years}
+              {model.name} · {model.subtitle}
             </span>
             <span>
               {size.label} · {size.length}
             </span>
           </div>
+          {model.credit && (
+            <p className="credit">
+              Modèle de base « {model.credit.name} » par{" "}
+              {model.credit.authorUrl ? <a href={model.credit.authorUrl} target="_blank" rel="noreferrer">{model.credit.author}</a> : model.credit.author}{" "}
+              ({model.credit.licence}), fourni par{" "}
+              <a href={model.credit.viewerUrl} target="_blank" rel="noreferrer">Sketchfab</a>.
+            </p>
+          )}
         </div>
       </div>
 
       <div className="panel">
-        <a href="/configurer" className="link back">← Changer de voiture</a>
+        <Link href="/configurer" className="link back">← Changer de voiture</Link>
+
+        {model.credit && (
+          <div className="fix">
+            <p className="sub">
+              {pick
+                ? `Clique sur ${pick === "paint" ? "la carrosserie" : pick === "rims" ? "une jante" : "un étrier"} dans la 3D.`
+                : "Une couleur ne va pas au bon endroit ? Choisis la pièce, puis clique dessus dans la 3D."}
+            </p>
+            <div className="chips">
+              {(Object.keys(pickLabels) as PickRole[]).map((k) => (
+                <button key={k} className={`chip ${pick === k ? "on" : ""}`} onClick={() => setPick(pick === k ? null : k)}>
+                  {pickLabels[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Step n={1} title="Jantes">
-          <Chips options={rimStyles} value={c.rims} onChange={(v) => set("rims", v)} />
-          <p className="sub">Couleur des jantes</p>
-          <Swatches list={wheelColors} value={c.rimColor} onChange={(v) => set("rimColor", v)} small />
+          {caps?.rimStyles !== false ? (
+            <Chips options={rimStyles} value={c.rims} onChange={(v) => set("rims", v)} />
+          ) : (
+            <p className="sub">Jantes de rechange indisponibles sur ce modèle : on garde celles d'origine.</p>
+          )}
+          {caps?.rims !== false && (
+            <>
+              <p className="sub">Couleur des jantes</p>
+              <Swatches list={wheelColors} value={c.rimColor} onChange={(v) => set("rimColor", v)} small />
+            </>
+          )}
         </Step>
 
         <Step n={2} title="Échappement">
-          <Chips options={exhausts} value={c.exhaust} onChange={(v) => set("exhaust", v)} />
+          {caps?.exhaust !== false ? (
+            <Chips options={exhausts} value={c.exhaust} onChange={(v) => set("exhaust", v)} />
+          ) : (
+            <p className="sub">Échappement non repéré sur ce modèle : on garde celui d'origine.</p>
+          )}
         </Step>
 
         <Step n={3} title="Couleur">
@@ -118,8 +176,12 @@ export default function Configurator3D({ car }: { car: Car }) {
           </div>
           <p className="sub">{c.paintName}</p>
           <Chips options={finishes} value={c.finish} onChange={(v) => set("finish", v)} />
-          <p className="sub">Étriers de frein</p>
-          <Swatches list={caliperColors} value={c.caliper} onChange={(v) => set("caliper", v)} small />
+          {caps?.calipers !== false && (
+            <>
+              <p className="sub">Étriers de frein</p>
+              <Swatches list={caliperColors} value={c.caliper} onChange={(v) => set("caliper", v)} small />
+            </>
+          )}
         </Step>
 
         <Step n={4} title="Taille">
