@@ -10,7 +10,20 @@ npm run dev
 # http://localhost:3000
 ```
 
-## Ce que fait la V1
+## Ce que fait le site
+
+- **Accueil (`/`)** : dépôt de la voiture. Deux modes : **4 photos guidées** (avant, gauche, arrière, droite, + photos de détail facultatives), recommandé car c'est l'entrée idéale des IA multi-vues (Tripo, Meshy), ou **une vidéo** (tour complet, plus simple pour le client, on en extrait les images). Plus email et nom de la voiture.
+- Les fichiers partent directement du navigateur vers **Vercel Blob** (jusqu'à 500 Mo par fichier), dans `submissions/<date>-<id>/`, avec un `demande.json` (email, voiture, liste des fichiers).
+- Sans stockage branché, l'envoi est simulé (« mode démo »).
+
+## Brancher le stockage des photos (Vercel Blob)
+
+1. Dans Vercel : projet → **Storage** → **Create** → **Blob**, en accès **Private** (les photos montrent des plaques), puis le connecter au projet.
+2. Vercel ajoute tout seul la variable `BLOB_READ_WRITE_TOKEN`. Redéployer.
+3. Les demandes reçues se consultent dans Storage → le store Blob → dossier `submissions/`.
+4. Si tu crées un store **Public** à la place, ajoute `NEXT_PUBLIC_BLOB_ACCESS=public`.
+
+## Configurateur (`/configurer`)
 
 - Page d'accueil + configurateur : voiture (marque, modèle, année), photos ou vidéo, peinture (8 teintes + couleur libre, finition brillant / métallisé / mat), jantes (style + couleur), aileron, plaque, taille (1:43, 1:24, 1:18), finitions (socle, vitrine).
 - Aperçu 2D en direct (SVG) qui suit les choix. Il sera remplacé par le viewer 3D.
