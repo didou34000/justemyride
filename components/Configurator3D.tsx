@@ -1,37 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import CarPreview from "./CarPreview";
-import Plate from "./Plate";
+import CarViewer from "./CarViewer";
+import type { Car } from "@/lib/cars";
 import {
   accessories,
+  caliperColors,
   colors,
+  exhausts,
   finishes,
+  ORIGINE,
   priceOf,
+  rimStyles,
   sizes,
-  spoilers,
   wheelColors,
-  wheelStyles,
   type Config,
+  type Option,
 } from "@/lib/options";
 
-const initial: Config = {
-  make: "",
-  model: "",
-  year: "",
-  color: colors[3].hex,
-  colorName: colors[3].label,
-  finish: "brillant",
-  wheelStyle: "cinq",
-  wheelColor: "noir",
-  spoiler: "aucun",
-  plate: "",
-  accessories: [],
-  size: "1-24",
-};
-
-export default function Configurator() {
-  const [c, setC] = useState<Config>(initial);
+export default function Configurator3D({ car }: { car: Car }) {
+  const [c, setC] = useState<Config>({
+    car: car.slug,
+    carName: `${car.make} ${car.model}`,
+    paint: ORIGINE,
+    paintName: "D'origine",
+    finish: "metal",
+    rims: ORIGINE,
+    rimColor: ORIGINE,
+    exhaust: ORIGINE,
+    caliper: ORIGINE,
+    size: "1-24",
+    accessories: [],
+  });
   const [status, setStatus] = useState<"idle" | "loading" | "demo" | "error">("idle");
   const [error, setError] = useState("");
 
@@ -59,93 +59,70 @@ export default function Configurator() {
   }
 
   return (
-    <section id="configurer" className="config">
+    <section className="config">
       <div className="stage">
-        <div className="stage-inner">
-          <p className="eyebrow">Aperçu</p>
-          <CarPreview config={c} />
+        <div className="stage-inner viewer-wrap">
+          <CarViewer car={car} config={c} />
           <div className="stage-meta">
-            <span>{[c.make, c.model, c.year].filter(Boolean).join(" ") || "Ta voiture"}</span>
+            <span>
+              {car.make} {car.model} · {car.years}
+            </span>
             <span>
               {size.label} · {size.length}
             </span>
           </div>
-          <Plate text={c.plate} />
-          <p className="hint">Aperçu indicatif. Le modèle 3D de ta voiture arrive bientôt ici.</p>
         </div>
       </div>
 
       <div className="panel">
-        <Step n={1} title="Ta voiture">
-          <div className="row3">
-            <input placeholder="Marque" value={c.make} onChange={(e) => set("make", e.target.value)} />
-            <input placeholder="Modèle" value={c.model} onChange={(e) => set("model", e.target.value)} />
-            <input
-              placeholder="Année"
-              inputMode="numeric"
-              maxLength={4}
-              value={c.year}
-              onChange={(e) => set("year", e.target.value.replace(/\D/g, ""))}
-            />
-          </div>
+        <a href="/configurer" className="link back">← Changer de voiture</a>
+
+        <Step n={1} title="Jantes">
+          <Chips options={rimStyles} value={c.rims} onChange={(v) => set("rims", v)} />
+          <p className="sub">Couleur des jantes</p>
+          <Swatches list={wheelColors} value={c.rimColor} onChange={(v) => set("rimColor", v)} small />
         </Step>
 
-        <Step n={2} title="Peinture">
+        <Step n={2} title="Échappement">
+          <Chips options={exhausts} value={c.exhaust} onChange={(v) => set("exhaust", v)} />
+        </Step>
+
+        <Step n={3} title="Couleur">
           <div className="swatches">
+            <button
+              className={`swatch origin ${c.paint === ORIGINE ? "on" : ""}`}
+              title="Couleur d'origine du modèle"
+              aria-label="Couleur d'origine"
+              onClick={() => setC((p) => ({ ...p, paint: ORIGINE, paintName: "D'origine" }))}
+            >
+              ↺
+            </button>
             {colors.map((col) => (
               <button
                 key={col.id}
-                className={`swatch ${c.color === col.hex ? "on" : ""}`}
+                className={`swatch ${c.paint === col.hex ? "on" : ""}`}
                 style={{ background: col.hex }}
                 title={col.label}
                 aria-label={col.label}
-                onClick={() => setC((p) => ({ ...p, color: col.hex, colorName: col.label }))}
+                onClick={() => setC((p) => ({ ...p, paint: col.hex, paintName: col.label }))}
               />
             ))}
             <label className="swatch custom" title="Couleur personnalisée">
               <input
                 type="color"
-                value={c.color}
-                onChange={(e) => setC((p) => ({ ...p, color: e.target.value, colorName: "Personnalisée" }))}
+                value={c.paint === ORIGINE ? "#1f3f8f" : c.paint}
+                onChange={(e) => setC((p) => ({ ...p, paint: e.target.value, paintName: "Personnalisée" }))}
               />
               +
             </label>
           </div>
-          <p className="sub">{c.colorName}</p>
+          <p className="sub">{c.paintName}</p>
           <Chips options={finishes} value={c.finish} onChange={(v) => set("finish", v)} />
+          <p className="sub">Étriers de frein</p>
+          <Swatches list={caliperColors} value={c.caliper} onChange={(v) => set("caliper", v)} small />
         </Step>
 
-        <Step n={3} title="Jantes">
-          <Chips options={wheelStyles} value={c.wheelStyle} onChange={(v) => set("wheelStyle", v)} />
-          <div className="swatches small">
-            {wheelColors.map((w) => (
-              <button
-                key={w.id}
-                className={`swatch ${c.wheelColor === w.id ? "on" : ""}`}
-                style={{ background: w.hex }}
-                title={w.label}
-                aria-label={w.label}
-                onClick={() => set("wheelColor", w.id)}
-              />
-            ))}
-          </div>
-        </Step>
-
-        <Step n={4} title="Aileron">
-          <Chips options={spoilers} value={c.spoiler} onChange={(v) => set("spoiler", v)} />
-        </Step>
-
-        <Step n={5} title="Immatriculation">
-          <input
-            className="plate-input"
-            placeholder="AB-123-CD"
-            maxLength={10}
-            value={c.plate}
-            onChange={(e) => set("plate", e.target.value.toUpperCase())}
-          />
-        </Step>
-
-        <Step n={6} title="Taille">
+        <Step n={4} title="Taille">
           <div className="sizes">
             {sizes.map((s) => (
               <button key={s.id} className={`size ${c.size === s.id ? "on" : ""}`} onClick={() => set("size", s.id)}>
@@ -157,7 +134,7 @@ export default function Configurator() {
           </div>
         </Step>
 
-        <Step n={7} title="Finitions">
+        <Step n={5} title="Finitions">
           <div className="checks">
             {accessories.map((a) => (
               <label key={a.id} className="check">
@@ -202,7 +179,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   return (
     <div className="step">
       <h3>
-        <span>{String(n).padStart(2, "0")}</span>
+        <span>0{n}</span>
         {title}
       </h3>
       {children}
@@ -210,15 +187,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-function Chips({
-  options,
-  value,
-  onChange,
-}: {
-  options: { id: string; label: string; price?: number }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function Chips({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: string) => void }) {
   return (
     <div className="chips">
       {options.map((o) => (
@@ -226,6 +195,41 @@ function Chips({
           {o.label}
           {o.price ? <em> +{o.price} €</em> : null}
         </button>
+      ))}
+    </div>
+  );
+}
+
+function Swatches({
+  list,
+  value,
+  onChange,
+  small,
+}: {
+  list: { id: string; label: string; hex: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  small?: boolean;
+}) {
+  return (
+    <div className={`swatches ${small ? "tight" : ""}`}>
+      <button
+        className={`swatch origin ${value === ORIGINE ? "on" : ""}`}
+        title="D'origine"
+        aria-label="D'origine"
+        onClick={() => onChange(ORIGINE)}
+      >
+        ↺
+      </button>
+      {list.map((w) => (
+        <button
+          key={w.id}
+          className={`swatch ${value === w.id ? "on" : ""}`}
+          style={{ background: w.hex }}
+          title={w.label}
+          aria-label={w.label}
+          onClick={() => onChange(w.id)}
+        />
       ))}
     </div>
   );

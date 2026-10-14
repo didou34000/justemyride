@@ -11,7 +11,7 @@ const TIPS = [
 export default function Home() {
   return (
     <main>
-      <Nav link={{ href: "/configurer", label: "Options" }} />
+      <Nav link={{ href: "/configurer", label: "Configurateur" }} />
 
       <section className="home">
         <div className="home-copy">

@@ -17,23 +17,11 @@ export const finishes: Option[] = [
   { id: "mat", label: "Mat" },
 ];
 
-export const wheelStyles: Option[] = [
-  { id: "cinq", label: "5 branches" },
-  { id: "multi", label: "Multibranches" },
-  { id: "turbine", label: "Turbine" },
-];
-
 export const wheelColors = [
   { id: "argent", label: "Argent", hex: "#c9ccd1" },
   { id: "noir", label: "Noir", hex: "#1b1c1f" },
   { id: "bronze", label: "Bronze", hex: "#8c6a3f" },
   { id: "or", label: "Or", hex: "#c9a227" },
-];
-
-export const spoilers: Option[] = [
-  { id: "aucun", label: "Aucun" },
-  { id: "lip", label: "Discret" },
-  { id: "gt", label: "Aileron GT", price: 10 },
 ];
 
 export const accessories: Option[] = [
@@ -47,27 +35,49 @@ export const sizes = [
   { id: "1-18", label: "1:18", length: "≈ 25 cm", price: 219 },
 ];
 
+export const ORIGINE = "origine";
+
+export const rimStyles: Option[] = [
+  { id: ORIGINE, label: "D'origine" },
+  { id: "cinq", label: "5 doubles branches" },
+  { id: "multi", label: "Multibranches" },
+  { id: "turbine", label: "Turbine" },
+];
+
+export const exhausts: Option[] = [
+  { id: ORIGINE, label: "D'origine" },
+  { id: "xl", label: "Grosses sorties" },
+  { id: "double", label: "Double sortie" },
+  { id: "carree", label: "Sorties carrées" },
+];
+
+export const caliperColors = [
+  { id: "rouge", label: "Rouge", hex: "#c4161c" },
+  { id: "jaune", label: "Jaune", hex: "#f2c200" },
+  { id: "bleu", label: "Bleu", hex: "#1f6fd1" },
+  { id: "noir", label: "Noir", hex: "#1b1c1f" },
+];
+
+/** Une configuration sur une voiture du catalogue. "origine" = on garde la pièce du modèle. */
 export type Config = {
-  make: string;
-  model: string;
-  year: string;
-  color: string; // hex
-  colorName: string;
+  car: string; // slug
+  carName: string;
+  paint: string; // hex ou "origine"
+  paintName: string;
   finish: string;
-  wheelStyle: string;
-  wheelColor: string;
-  spoiler: string;
-  plate: string;
-  accessories: string[];
+  rims: string;
+  rimColor: string; // id de wheelColors ou "origine"
+  exhaust: string;
+  caliper: string; // id de caliperColors ou "origine"
   size: string;
+  accessories: string[];
 };
 
 export function priceOf(c: Config): number {
   const size = sizes.find((s) => s.id === c.size)?.price ?? 0;
-  const spoiler = spoilers.find((s) => s.id === c.spoiler)?.price ?? 0;
   const acc = c.accessories.reduce(
     (sum, id) => sum + (accessories.find((a) => a.id === id)?.price ?? 0),
     0
   );
-  return size + spoiler + acc;
+  return size + acc;
 }

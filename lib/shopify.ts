@@ -1,4 +1,7 @@
-import type { Config } from "./options";
+import { caliperColors, exhausts, rimStyles, wheelColors, type Config } from "./options";
+
+const label = (list: { id: string; label: string }[], id: string) =>
+  id === "origine" ? "D'origine" : list.find((o) => o.id === id)?.label ?? id;
 
 const API_VERSION = "2025-07";
 
@@ -9,7 +12,6 @@ const sizeVariant: Record<string, string | undefined> = {
 };
 
 const extraVariant: Record<string, string | undefined> = {
-  gt: process.env.SHOPIFY_VARIANT_SPOILER_GT,
   socle: process.env.SHOPIFY_VARIANT_BASE,
   vitrine: process.env.SHOPIFY_VARIANT_CASE,
 };
@@ -27,16 +29,16 @@ export async function createCheckout(c: Config): Promise<string> {
 
   // La configuration voyage avec la ligne principale : elle apparaît dans la commande.
   const attributes = [
-    { key: "Voiture", value: `${c.make} ${c.model} ${c.year}`.trim() },
-    { key: "Couleur", value: `${c.colorName} (${c.color})` },
+    { key: "Voiture", value: c.carName },
+    { key: "Couleur", value: c.paint === "origine" ? "D'origine" : `${c.paintName} (${c.paint})` },
     { key: "Finition", value: c.finish },
-    { key: "Jantes", value: `${c.wheelStyle} / ${c.wheelColor}` },
-    { key: "Aileron", value: c.spoiler },
-    { key: "Plaque", value: c.plate || "—" },
+    { key: "Jantes", value: `${label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },
+    { key: "Échappement", value: label(exhausts, c.exhaust) },
+    { key: "Étriers", value: label(caliperColors, c.caliper) },
   ];
 
   const lines = [{ merchandiseId: main, quantity: 1, attributes }];
-  for (const id of [c.spoiler, ...c.accessories]) {
+  for (const id of c.accessories) {
     const v = extraVariant[id];
     if (v) lines.push({ merchandiseId: v, quantity: 1, attributes: [] });
   }
