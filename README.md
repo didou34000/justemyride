@@ -12,7 +12,7 @@ npm run dev
 
 ## Ce que fait le site
 
-- **Accueil (`/`)** : dépôt de la voiture. Deux modes : **4 photos guidées** (avant, gauche, arrière, droite, + photos de détail facultatives), recommandé car c'est l'entrée idéale des IA multi-vues (Tripo, Meshy), ou **une vidéo** (tour complet, plus simple pour le client, on en extrait les images). Plus email et nom de la voiture.
+- **Accueil (`/`)** : dépôt de la voiture. Deux modes : **8 photos guidées** (4 faces + 4 trois-quarts, + 4 photos de détail facultatives) : les 4 faces sont l'entrée idéale des IA multi-vues (Tripo, Meshy), les 3/4 servent au choix des meilleures vues et à la retouche Blender, ou **une vidéo** (tour complet, plus simple pour le client, on en extrait les images). Plus email et nom de la voiture.
 - Les fichiers partent directement du navigateur vers **Vercel Blob** (jusqu'à 500 Mo par fichier), dans `submissions/<date>-<id>/`, avec un `demande.json` (email, voiture, liste des fichiers).
 - Sans stockage branché, l'envoi est simulé (« mode démo »).
 

@@ -5,18 +5,23 @@ import { useEffect, useMemo, useState } from "react";
 import AngleIcon from "./AngleIcon";
 import { BLOB_ACCESS } from "@/lib/storage";
 
+// Les 4 faces nourrissent l'IA multi-vues ; les 3/4 servent à choisir les meilleures vues et à la retouche.
 const SLOTS = [
-  { id: "avant", label: "Face avant" },
+  { id: "avant", label: "Avant" },
+  { id: "avant-gauche", label: "3/4 avant gauche" },
   { id: "gauche", label: "Côté gauche" },
-  { id: "arriere", label: "Face arrière" },
+  { id: "arriere-gauche", label: "3/4 arrière gauche" },
+  { id: "arriere", label: "Arrière" },
+  { id: "arriere-droite", label: "3/4 arrière droit" },
   { id: "droite", label: "Côté droit" },
+  { id: "avant-droite", label: "3/4 avant droit" },
 ] as const;
 
 type SlotId = (typeof SLOTS)[number]["id"];
 type Mode = "photos" | "video";
 type Phase = "idle" | "sending" | "done" | "error";
 
-const MAX_EXTRAS = 8;
+const MAX_EXTRAS = 4;
 
 export default function Uploader() {
   const [mode, setMode] = useState<Mode>("photos");
@@ -140,7 +145,7 @@ export default function Uploader() {
       {mode === "photos" ? (
         <>
           <p className="up-lead">
-            4 photos nettes, une par côté. C'est ce qui donne le modèle le plus fidèle.
+            8 photos en tournant autour de la voiture. C'est ce qui donne le modèle le plus fidèle.
           </p>
           <div className="slots">
             {SLOTS.map((s) => (
@@ -173,7 +178,7 @@ export default function Uploader() {
             <span>
               {extras.length
                 ? `${extras.length} photo(s) de détail ajoutée(s)`
-                : "+ Photos de détail (3/4, jantes, aileron, logos…) — facultatif"}
+                : "+ Jusqu'à 4 photos de détail (jantes, aileron, logos…), facultatif"}
             </span>
           </label>
         </>
@@ -208,7 +213,7 @@ export default function Uploader() {
         </div>
       )}
       <p className="up-foot">
-        {mode === "photos" && filled < SLOTS.length ? `${filled}/4 photos · ` : ""}
+        {mode === "photos" && filled < SLOTS.length ? `${filled}/${SLOTS.length} photos · ` : ""}
         Tes fichiers servent uniquement à modéliser ta voiture.
       </p>
       {phase === "error" && <p className="notice err">{error}</p>}

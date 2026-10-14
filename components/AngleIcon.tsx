@@ -1,9 +1,13 @@
 /** Vue de dessus de la voiture (avant en haut) avec la position de l'appareil photo. */
 const CAMERA: Record<string, [number, number, number]> = {
   avant: [40, 6, 180],
-  arriere: [40, 74, 0],
+  "avant-gauche": [12, 12, 135],
   gauche: [6, 40, 90],
+  "arriere-gauche": [12, 68, 45],
+  arriere: [40, 74, 0],
+  "arriere-droite": [68, 68, -45],
   droite: [74, 40, -90],
+  "avant-droite": [68, 12, -135],
 };
 
 export default function AngleIcon({ angle }: { angle: keyof typeof CAMERA | string }) {
