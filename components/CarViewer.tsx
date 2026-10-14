@@ -21,6 +21,11 @@ import { caliperColors, ORIGINE, wheelColors, type Config } from "@/lib/options"
 
 export type Roles = { paint: string[]; rims: string[]; calipers: string[]; exhaust: string[]; tyres: string[] };
 export type ModelSource = { url: string; zip?: boolean; lengthM?: number; roles?: Roles };
+
+/** Noms posés par tools/prepare_car.py sur un modèle préparé (« standard »). */
+const STANDARD: Roles = {
+  paint: ["JMR_Paint"], rims: ["JMR_Rim"], calipers: ["JMR_Caliper"], exhaust: ["JMR_Exhaust"], tyres: ["JMR_Tyre"],
+};
 /** Ce que le modèle permet de personnaliser. */
 export type Caps = { paint: boolean; rims: boolean; rimStyles: boolean; calipers: boolean; exhaust: boolean };
 export type PickRole = "paint" | "rims" | "calipers";
@@ -312,7 +317,8 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
 
   const original = new Map<THREE.Mesh, Mat>();
   for (const m of meshes) original.set(m, m.material as Mat);
-  const roles = source.roles ? named(meshes, source.roles) : guess(kept, original);
+  const prepared = meshes.some((m) => (m.material as Mat).name === "JMR_Paint");
+  const roles = source.roles ? named(meshes, source.roles) : prepared ? named(meshes, STANDARD) : guess(kept, original);
 
   // L'échappement est à l'arrière : on veut l'arrière vers -Z, donc l'avant vers +Z.
   const ex = worldPoints(kept.filter((m) => roles.exhaust.has(original.get(m)!)));
@@ -353,9 +359,34 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
   };
   const paint = [...roles.paint][0];
   if (paint) setRole(r, "paint", paint);
-  measureWheels(r);
-  measureTips(r);
+  if (!readAnchors(r, model)) {
+    measureWheels(r);
+    measureTips(r);
+  }
   return r;
+}
+
+/** Ancres JMR_Wheel_* / JMR_Exhaust_* d'un modèle préparé : plus fiables que la mesure à la volée. */
+function readAnchors(r: Rig, model: THREE.Object3D) {
+  const wheels: Wheel[] = [];
+  const tips: Tip[] = [];
+  model.updateMatrixWorld(true);
+  model.traverse((o) => {
+    const d = o.userData as { radius?: number; width?: number };
+    if (!d.radius) return;
+    const pos = o.getWorldPosition(new THREE.Vector3());
+    const scale = o.getWorldScale(new THREE.Vector3()).x;
+    if (o.name.startsWith("JMR_Wheel")) {
+      wheels.push({ center: pos, radius: d.radius * scale, width: (d.width ?? 0.22) * scale, side: Math.sign(pos.x) });
+    } else if (o.name.startsWith("JMR_Exhaust")) {
+      tips.push({ center: pos, radius: d.radius * scale, rearZ: pos.z });
+    }
+  });
+  if (!wheels.length && !tips.length) return false;
+  r.wheels = wheels;
+  r.tips = tips;
+  r.built.rims = "";
+  return true;
 }
 
 const emptyRoles = () => ({
@@ -437,7 +468,7 @@ function setRole(r: Rig, role: PickRole, mat: Mat) {
     p.needsUpdate = true;
     for (const m of r.meshes) if (r.original.get(m) === paint) m.material = p;
   }
-  if (role === "rims") measureWheels(r);
+  if (role === "rims" && !r.wheels.length) measureWheels(r);
 }
 
 function meshesOf(r: Rig, set: Set<Mat>) {
