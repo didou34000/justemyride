@@ -1,71 +1,84 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AngleIcon from "./AngleIcon";
 import { BLOB_ACCESS } from "@/lib/storage";
 
-// Les 4 faces nourrissent l'IA multi-vues ; les 3/4 servent à choisir les meilleures vues et à la retouche.
-const SLOTS = [
-  { id: "avant", label: "Avant" },
-  { id: "avant-gauche", label: "3/4 avant gauche" },
-  { id: "gauche", label: "Côté gauche" },
-  { id: "arriere-gauche", label: "3/4 arrière gauche" },
-  { id: "arriere", label: "Arrière" },
-  { id: "arriere-droite", label: "3/4 arrière droit" },
-  { id: "droite", label: "Côté droit" },
-  { id: "avant-droite", label: "3/4 avant droit" },
+// Ordre = un tour complet de la voiture. Les 4 faces nourrissent l'IA multi-vues ;
+// les 3/4 servent à choisir les meilleures vues et à la retouche.
+const ANGLES = [
+  { id: "avant", label: "Face avant", tip: "Face à la voiture, centré sur le logo. Recule jusqu'à voir les deux rétroviseurs." },
+  { id: "avant-gauche", label: "3/4 avant gauche", tip: "Place-toi à l'angle avant gauche, en diagonale. On doit voir la face avant et tout le côté conducteur." },
+  { id: "gauche", label: "Côté gauche", tip: "Bien de profil côté conducteur, face au milieu de la voiture. Les deux roues entières dans le cadre." },
+  { id: "arriere-gauche", label: "3/4 arrière gauche", tip: "Angle arrière gauche, en diagonale. Face arrière et côté conducteur visibles." },
+  { id: "arriere", label: "Face arrière", tip: "Derrière la voiture, centré sur la plaque. Les deux feux dans le cadre." },
+  { id: "arriere-droite", label: "3/4 arrière droit", tip: "Angle arrière droit, en diagonale. Face arrière et côté passager visibles." },
+  { id: "droite", label: "Côté droit", tip: "Bien de profil côté passager, face au milieu de la voiture. Les deux roues entières dans le cadre." },
+  { id: "avant-droite", label: "3/4 avant droit", tip: "Dernier angle : avant droit, en diagonale. Face avant et côté passager visibles." },
 ] as const;
 
-type SlotId = (typeof SLOTS)[number]["id"];
-type Mode = "photos" | "video";
+type AngleId = (typeof ANGLES)[number]["id"];
 type Phase = "idle" | "sending" | "done" | "error";
 
-const MAX_EXTRAS = 4;
+const DETAILS_STEP = ANGLES.length;
+const CONTACT_STEP = ANGLES.length + 1;
+const MAX_DETAILS = 4;
 
 export default function Uploader() {
-  const [mode, setMode] = useState<Mode>("photos");
-  const [slots, setSlots] = useState<Partial<Record<SlotId, File>>>({});
-  const [extras, setExtras] = useState<File[]>([]);
-  const [video, setVideo] = useState<File | null>(null);
+  const [step, setStep] = useState(0);
+  const [photos, setPhotos] = useState<Partial<Record<AngleId, File>>>({});
+  const [details, setDetails] = useState<File[]>([]);
   const [email, setEmail] = useState("");
   const [car, setCar] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [storage, setStorage] = useState<boolean | null>(null);
+  const [justAdded, setJustAdded] = useState(false);
+  const advance = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     fetch("/api/storage")
       .then((r) => r.json())
       .then((d) => setStorage(Boolean(d.enabled)))
       .catch(() => setStorage(false));
+    return () => clearTimeout(advance.current);
   }, []);
 
   const previews = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const [k, f] of Object.entries(slots)) if (f) m[k] = URL.createObjectURL(f);
+    const m: Partial<Record<AngleId, string>> = {};
+    for (const [k, f] of Object.entries(photos)) if (f) m[k as AngleId] = URL.createObjectURL(f);
     return m;
-  }, [slots]);
+  }, [photos]);
+  const detailPreviews = useMemo(() => details.map((f) => URL.createObjectURL(f)), [details]);
 
-  const filled = SLOTS.filter((s) => slots[s.id]).length;
-  const filesReady = mode === "photos" ? filled === SLOTS.length : Boolean(video);
+  const done = ANGLES.filter((a) => photos[a.id]).length;
+  const allPhotos = done === ANGLES.length;
+  const firstMissing = ANGLES.findIndex((a) => !photos[a.id]);
   const emailOk = /^\S+@\S+\.\S+$/.test(email);
-  const canSend = filesReady && emailOk && phase !== "sending";
 
-  function toSend(): { slot: string; file: File }[] {
-    if (mode === "video") return video ? [{ slot: "video", file: video }] : [];
-    return [
-      ...SLOTS.flatMap((s) => (slots[s.id] ? [{ slot: s.id, file: slots[s.id]! }] : [])),
-      ...extras.map((file, i) => ({ slot: `detail-${i + 1}`, file })),
-    ];
+  function addPhoto(id: AngleId, file: File) {
+    const next = { ...photos, [id]: file };
+    setPhotos(next);
+    setJustAdded(true);
+    clearTimeout(advance.current);
+    // Laisse voir la photo un instant, puis passe à l'angle suivant encore vide.
+    advance.current = setTimeout(() => {
+      setJustAdded(false);
+      const missing = ANGLES.findIndex((a) => !next[a.id]);
+      setStep(missing === -1 ? DETAILS_STEP : missing);
+    }, 900);
   }
 
   async function send() {
     setPhase("sending");
     setError("");
     setProgress(0);
-    const files = toSend();
+    const files = [
+      ...ANGLES.map((a) => ({ slot: a.id as string, file: photos[a.id]! })),
+      ...details.map((file, i) => ({ slot: `detail-${i + 1}`, file })),
+    ];
     const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
 
     try {
@@ -83,7 +96,7 @@ export default function Uploader() {
       const loaded: Record<string, number> = {};
       const uploaded = await Promise.all(
         files.map(async ({ slot, file }) => {
-          const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+          const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
           const blob = await upload(`submissions/${id}/${slot}.${ext}`, file, {
             access: BLOB_ACCESS,
             handleUploadUrl: "/api/upload",
@@ -101,7 +114,7 @@ export default function Uploader() {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, email, car, mode, files: uploaded }),
+        body: JSON.stringify({ id, email, car, mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
       setProgress(100);
@@ -131,92 +144,157 @@ export default function Uploader() {
     );
   }
 
+  const angle = step < ANGLES.length ? ANGLES[step] : null;
+
   return (
-    <div className="up-card" id="deposer">
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={mode === "photos"} className={mode === "photos" ? "on" : ""} onClick={() => setMode("photos")}>
-          Photos <span className="tag">Recommandé</span>
-        </button>
-        <button role="tab" aria-selected={mode === "video"} className={mode === "video" ? "on" : ""} onClick={() => setMode("video")}>
-          Vidéo
-        </button>
+    <div className="up-card wizard" id="deposer">
+      <div className="wz-head">
+        <span>
+          {angle ? `Photo ${step + 1} sur ${ANGLES.length}` : step === DETAILS_STEP ? "Détails" : "Dernière étape"}
+        </span>
+        <span className="wz-count">{done}/{ANGLES.length}</span>
+      </div>
+      <div className="segments" aria-hidden>
+        {ANGLES.map((a, i) => (
+          <i key={a.id} className={photos[a.id] ? "ok" : i === step ? "cur" : ""} />
+        ))}
       </div>
 
-      {mode === "photos" ? (
+      {angle && (
         <>
-          <p className="up-lead">
-            8 photos en tournant autour de la voiture. C'est ce qui donne le modèle le plus fidèle.
+          <div className="frame">
+            {previews[angle.id] ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="frame-photo" src={previews[angle.id]} alt={`Ta photo : ${angle.label}`} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="frame-inset" src={`/guide/${angle.id}.png`} alt="" />
+                {justAdded && <div className="frame-ok">✓</div>}
+              </>
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="frame-guide" src={`/guide/${angle.id}.png`} alt={`Exemple : ${angle.label}`} />
+                <div className="frame-map">
+                  <AngleIcon angle={angle.id} />
+                </div>
+              </>
+            )}
+          </div>
+
+          <h2 className="wz-title">{angle.label}</h2>
+          <p className="wz-tip">{angle.tip}</p>
+          <p className="wz-tip small">À hauteur des phares, à 3 ou 4 mètres, toute la voiture dans le cadre.</p>
+
+          <label className="cta full file-btn">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) addPhoto(angle.id, f);
+                e.target.value = "";
+              }}
+            />
+            {photos[angle.id] ? "Reprendre cette photo" : "Ajouter la photo"}
+          </label>
+        </>
+      )}
+
+      {step === DETAILS_STEP && (
+        <>
+          <h2 className="wz-title">Des détails à nous montrer ?</h2>
+          <p className="wz-tip">
+            Jantes, aileron, logos, kit carrosserie… Jusqu'à {MAX_DETAILS} photos. Facultatif.
           </p>
-          <div className="slots">
-            {SLOTS.map((s) => (
-              <label key={s.id} className={`slot ${slots[s.id] ? "filled" : ""}`}>
+          <div className="detail-grid">
+            {Array.from({ length: MAX_DETAILS }).map((_, i) => (
+              <label key={i} className={`detail ${details[i] ? "filled" : ""}`}>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) setSlots((p) => ({ ...p, [s.id]: f }));
+                    if (f) setDetails((d) => [...d.slice(0, i), f, ...d.slice(i + 1)].filter(Boolean));
+                    e.target.value = "";
                   }}
                 />
-                {previews[s.id] ? (
+                {details[i] ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={previews[s.id]} alt={s.label} />
+                  <img src={detailPreviews[i]} alt="" />
                 ) : (
-                  <AngleIcon angle={s.id} />
+                  <span>+</span>
                 )}
-                <span>{s.label}</span>
               </label>
             ))}
           </div>
-          <label className="extras">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setExtras(Array.from(e.target.files ?? []).slice(0, MAX_EXTRAS))}
-            />
-            <span>
-              {extras.length
-                ? `${extras.length} photo(s) de détail ajoutée(s)`
-                : "+ Jusqu'à 4 photos de détail (jantes, aileron, logos…), facultatif"}
-            </span>
-          </label>
+          <button className="cta full" onClick={() => setStep(CONTACT_STEP)}>
+            {details.length ? "Continuer" : "Passer cette étape"}
+          </button>
         </>
-      ) : (
+      )}
+
+      {step === CONTACT_STEP && (
         <>
-          <p className="up-lead">
-            Un tour complet et lent de la voiture, 30 à 60 secondes. Plus simple, un peu moins précis.
-          </p>
-          <label className={`video-drop ${video ? "filled" : ""}`}>
-            <input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
-            <svg viewBox="0 0 24 24" aria-hidden>
-              <rect x="2.5" y="6" width="13" height="12" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M15.5 10.5 L21.5 7 V17 L15.5 13.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
-            <strong>{video ? video.name : "Choisir une vidéo"}</strong>
-            <span>{video ? `${(video.size / 1024 / 1024).toFixed(0)} Mo` : "MP4 ou MOV, 500 Mo max"}</span>
-          </label>
+          <h2 className="wz-title">On te prévient où ?</h2>
+          <p className="wz-tip">On t'écrit dès que ton modèle 3D est prêt à personnaliser.</p>
+          <div className="up-fields">
+            <input placeholder="Ta voiture (ex. Golf 8 GTI 2021)" value={car} onChange={(e) => setCar(e.target.value)} />
+            <input type="email" placeholder="Ton email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <button className="cta full" disabled={!allPhotos || !emailOk || phase === "sending"} onClick={send}>
+            {phase === "sending" ? `Envoi… ${progress} %` : "Envoyer ma voiture"}
+          </button>
+          {phase === "sending" && (
+            <div className="bar">
+              <div style={{ width: `${progress}%` }} />
+            </div>
+          )}
+          {!allPhotos && (
+            <p className="notice">
+              Il manque {ANGLES.length - done} photo(s).{" "}
+              <button className="link" onClick={() => setStep(firstMissing)}>
+                Compléter
+              </button>
+            </p>
+          )}
+          {phase === "error" && <p className="notice err">{error}</p>}
         </>
       )}
 
-      <div className="up-fields">
-        <input placeholder="Ta voiture (ex. Golf 8 GTI 2021)" value={car} onChange={(e) => setCar(e.target.value)} />
-        <input type="email" placeholder="Ton email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <div className="thumbs-nav">
+        {ANGLES.map((a, i) => (
+          <button
+            key={a.id}
+            className={`tn ${i === step ? "cur" : ""} ${photos[a.id] ? "ok" : ""}`}
+            onClick={() => setStep(i)}
+            title={a.label}
+            aria-label={a.label}
+          >
+            {previews[a.id] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previews[a.id]} alt="" />
+            ) : (
+              <AngleIcon angle={a.id} />
+            )}
+          </button>
+        ))}
       </div>
-
-      <button className="cta full" disabled={!canSend} onClick={send}>
-        {phase === "sending" ? `Envoi… ${progress} %` : "Envoyer ma voiture"}
-      </button>
-      {phase === "sending" && (
-        <div className="bar">
-          <div style={{ width: `${progress}%` }} />
-        </div>
-      )}
-      <p className="up-foot">
-        {mode === "photos" && filled < SLOTS.length ? `${filled}/${SLOTS.length} photos · ` : ""}
-        Tes fichiers servent uniquement à modéliser ta voiture.
-      </p>
-      {phase === "error" && <p className="notice err">{error}</p>}
+      <div className="wz-nav">
+        <button className="link" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
+          ← Précédent
+        </button>
+        {step < CONTACT_STEP && (
+          <button
+            className="link"
+            disabled={step < ANGLES.length && !photos[ANGLES[step].id]}
+            onClick={() => setStep((s) => s + 1)}
+          >
+            Suivant →
+          </button>
+        )}
+      </div>
+      <p className="up-foot">Tes photos servent uniquement à modéliser ta voiture.</p>
     </div>
   );
 }

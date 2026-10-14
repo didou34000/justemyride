@@ -3,7 +3,7 @@ import Uploader from "@/components/Uploader";
 
 const TIPS = [
   ["Lumière douce", "Temps couvert ou ombre. Pas de soleil direct ni de contre-jour."],
-  ["Voiture entière", "Toute la voiture dans le cadre, à hauteur des phares, à 3 ou 4 mètres."],
+  ["Voiture entière", "Toute la voiture dans le cadre, à hauteur des phares, à 3 ou 4 mètres. Le guide te montre chaque angle."],
   ["Fond dégagé", "Un parking vide ou un mur uni. Évite les autres voitures autour."],
   ["Voiture propre", "Les reflets et la saleté perturbent la modélisation."],
 ];
@@ -22,7 +22,7 @@ export default function Home() {
             <span>En miniature.</span>
           </h1>
           <p className="lead">
-            Envoie-nous ta voiture en photos ou en vidéo. On la modélise en 3D, tu choisis teinte, jantes et
+            Prends ta voiture en photo en suivant le guide. On la modélise en 3D, tu choisis teinte, jantes et
             plaque, et on la fabrique en pièce unique.
           </p>
           <ol className="how">

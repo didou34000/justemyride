@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       onBeforeGenerateToken: async (pathname) => {
         if (!pathname.startsWith("submissions/")) throw new Error("Chemin refusé");
         return {
-          allowedContentTypes: ["image/*", "video/*"],
+          allowedContentTypes: ["image/*"],
           maximumSizeInBytes: MAX_FILE_BYTES,
           addRandomSuffix: true,
         };

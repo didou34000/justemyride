@@ -12,7 +12,8 @@ npm run dev
 
 ## Ce que fait le site
 
-- **Accueil (`/`)** : dépôt de la voiture. Deux modes : **8 photos guidées** (4 faces + 4 trois-quarts, + 4 photos de détail facultatives) : les 4 faces sont l'entrée idéale des IA multi-vues (Tripo, Meshy), les 3/4 servent au choix des meilleures vues et à la retouche Blender, ou **une vidéo** (tour complet, plus simple pour le client, on en extrait les images). Plus email et nom de la voiture.
+- **Accueil (`/`)** : parcours photo guidé, une étape par angle. 8 photos en faisant le tour de la voiture (4 faces + 4 trois-quarts) : pour chaque angle, une voiture modèle montre le cadrage attendu, avec un plan vu de dessus indiquant où se placer. Après chaque photo, le parcours passe tout seul à l'angle suivant. Puis jusqu'à 4 photos de détail (facultatif), puis voiture + email. Les 4 faces sont l'entrée idéale des IA multi-vues (Tripo, Meshy), les 3/4 servent au choix des meilleures vues et à la retouche Blender.
+- Les images d'exemple (`public/guide/*.png`) sont rendues avec three.js depuis `tools/guide-render.html` (voiture générique, aucune marque).
 - Les fichiers partent directement du navigateur vers **Vercel Blob** (jusqu'à 500 Mo par fichier), dans `submissions/<date>-<id>/`, avec un `demande.json` (email, voiture, liste des fichiers).
 - Sans stockage branché, l'envoi est simulé (« mode démo »).
 
@@ -25,7 +26,7 @@ npm run dev
 
 ## Configurateur (`/configurer`)
 
-- Page d'accueil + configurateur : voiture (marque, modèle, année), photos ou vidéo, peinture (8 teintes + couleur libre, finition brillant / métallisé / mat), jantes (style + couleur), aileron, plaque, taille (1:43, 1:24, 1:18), finitions (socle, vitrine).
+- Page d'accueil + configurateur : voiture (marque, modèle, année), peinture (8 teintes + couleur libre, finition brillant / métallisé / mat), jantes (style + couleur), aileron, plaque, taille (1:43, 1:24, 1:18), finitions (socle, vitrine).
 - Aperçu 2D en direct (SVG) qui suit les choix. Il sera remplacé par le viewer 3D.
 - Prix calculé en direct (`lib/options.ts`). **Les prix sont provisoires.**
 - Bouton « Commander » : crée un panier Shopify via la Storefront API si les variables d'environnement sont renseignées, sinon affiche un message « mode démo ».

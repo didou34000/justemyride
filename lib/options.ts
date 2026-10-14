@@ -60,7 +60,6 @@ export type Config = {
   plate: string;
   accessories: string[];
   size: string;
-  photoCount: number;
 };
 
 export function priceOf(c: Config): number {

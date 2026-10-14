@@ -13,7 +13,7 @@ const CAMERA: Record<string, [number, number, number]> = {
 export default function AngleIcon({ angle }: { angle: keyof typeof CAMERA | string }) {
   const cam = CAMERA[angle];
   return (
-    <svg viewBox="0 0 80 80" className="angle-icon" aria-hidden>
+    <svg viewBox="-6 -6 92 92" className="angle-icon" aria-hidden>
       <rect x="27" y="18" width="26" height="44" rx="9" fill="none" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
       <path d="M31,30 Q40,25 49,30" fill="none" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
       <path d="M31,52 Q40,56 49,52" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />

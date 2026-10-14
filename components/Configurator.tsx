@@ -28,25 +28,16 @@ const initial: Config = {
   plate: "",
   accessories: [],
   size: "1-24",
-  photoCount: 0,
 };
 
 export default function Configurator() {
   const [c, setC] = useState<Config>(initial);
-  const [photos, setPhotos] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "demo" | "error">("idle");
   const [error, setError] = useState("");
 
   const set = <K extends keyof Config>(k: K, v: Config[K]) => setC((p) => ({ ...p, [k]: v }));
   const total = priceOf(c);
   const size = sizes.find((s) => s.id === c.size)!;
-
-  function onFiles(files: FileList | null) {
-    if (!files) return;
-    const urls = Array.from(files).slice(0, 12).map((f) => URL.createObjectURL(f));
-    setPhotos(urls);
-    set("photoCount", urls.length);
-  }
 
   async function order() {
     setStatus("loading");
@@ -97,19 +88,6 @@ export default function Configurator() {
               onChange={(e) => set("year", e.target.value.replace(/\D/g, ""))}
             />
           </div>
-          <label className="drop">
-            <input type="file" accept="image/*,video/*" multiple onChange={(e) => onFiles(e.target.files)} />
-            <strong>{photos.length ? `${photos.length} fichier(s) ajouté(s)` : "Ajoute tes photos ou une vidéo"}</strong>
-            <span>Fais le tour complet de la voiture, de jour, sans contre-jour.</span>
-          </label>
-          {photos.length > 0 && (
-            <div className="thumbs">
-              {photos.map((u) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={u} src={u} alt="" />
-              ))}
-            </div>
-          )}
         </Step>
 
         <Step n={2} title="Peinture">

@@ -6,7 +6,7 @@ type Submission = {
   id: string;
   email: string;
   car: string;
-  mode: "photos" | "video";
+  mode: "photos";
   files: { slot: string; url: string; pathname: string }[];
 };
 
