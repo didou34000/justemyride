@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import CarViewer, { type Caps, type ModelSource, type PickRole } from "./CarViewer";
+import CarViewer, { SKETCHFAB, type Caps, type ModelSource, type PickRole } from "./CarViewer";
+import PartSearch, { type Part } from "./PartSearch";
 import {
   accessories,
   caliperColors,
@@ -53,6 +54,24 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
     size: "1-24",
     accessories: [],
   });
+  const [rimPart, setRimPart] = useState<Part | null>(null);
+  const [exPart, setExPart] = useState<Part | null>(null);
+  const [partStatus, setPartStatus] = useState({ rim: "", exhaust: "" });
+  const parts = useMemo(
+    () => ({
+      rim: c.rims === SKETCHFAB && rimPart ? { url: rimPart.url, zip: rimPart.zip, adjust: rimPart.adjust } : null,
+      exhaust: c.exhaust === SKETCHFAB && exPart ? { url: exPart.url, zip: exPart.zip, adjust: exPart.adjust } : null,
+    }),
+    [c.rims, c.exhaust, rimPart, exPart]
+  );
+  const chooseRim = (p: Part | null) => {
+    setRimPart(p);
+    setC((x) => ({ ...x, rims: p ? SKETCHFAB : ORIGINE, rimPart: p ? `${p.name} — ${p.viewerUrl}` : undefined }));
+  };
+  const chooseExhaust = (p: Part | null) => {
+    setExPart(p);
+    setC((x) => ({ ...x, exhaust: p ? SKETCHFAB : ORIGINE, exhaustPart: p ? `${p.name} — ${p.viewerUrl}` : undefined }));
+  };
   const [status, setStatus] = useState<"idle" | "loading" | "demo" | "error">("idle");
   const [error, setError] = useState("");
 
@@ -83,7 +102,15 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
     <section className="config">
       <div className="stage">
         <div className="stage-inner viewer-wrap">
-          <CarViewer source={source} config={c} pick={pick} onCaps={setCaps} onPicked={() => setPick(null)} />
+          <CarViewer
+            source={source}
+            config={c}
+            pick={pick}
+            onCaps={setCaps}
+            onPicked={() => setPick(null)}
+            parts={parts}
+            onPartStatus={(k, v) => setPartStatus((s) => ({ ...s, [k]: v }))}
+          />
           <div className="stage-meta">
             <span>
               {model.name} · {model.subtitle}
@@ -100,6 +127,13 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
               <a href={model.credit.viewerUrl} target="_blank" rel="noreferrer">Sketchfab</a>.
             </p>
           )}
+          {[parts.rim && rimPart, parts.exhaust && exPart].filter(Boolean).map((p) => (
+            <p className="credit" key={(p as Part).uid}>
+              Pièce « {(p as Part).name} » par{" "}
+              {(p as Part).authorUrl ? <a href={(p as Part).authorUrl} target="_blank" rel="noreferrer">{(p as Part).author}</a> : (p as Part).author}{" "}
+              ({(p as Part).licence}), fournie par <a href={(p as Part).viewerUrl} target="_blank" rel="noreferrer">Sketchfab</a>.
+            </p>
+          ))}
         </div>
       </div>
 
@@ -125,7 +159,11 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
 
         <Step n={1} title="Jantes">
           {caps?.rimStyles !== false ? (
-            <Chips options={rimStyles} value={c.rims} onChange={(v) => set("rims", v)} />
+            <>
+              <Chips options={rimStyles} value={c.rims} onChange={(v) => set("rims", v)} />
+              <p className="sub">Ou une vraie jante, trouvée sur Sketchfab et posée sur tes 4 roues :</p>
+              <PartSearch kind="rim" part={c.rims === SKETCHFAB ? rimPart : null} status={partStatus.rim} onChange={chooseRim} />
+            </>
           ) : (
             <p className="sub">Jantes de rechange indisponibles sur ce modèle : on garde celles d'origine.</p>
           )}
@@ -139,7 +177,11 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
 
         <Step n={2} title="Échappement">
           {caps?.exhaust !== false ? (
-            <Chips options={exhausts} value={c.exhaust} onChange={(v) => set("exhaust", v)} />
+            <>
+              <Chips options={exhausts} value={c.exhaust} onChange={(v) => set("exhaust", v)} />
+              <p className="sub">Ou un vrai échappement, trouvé sur Sketchfab et posé sur chaque sortie :</p>
+              <PartSearch kind="exhaust" part={c.exhaust === SKETCHFAB ? exPart : null} status={partStatus.exhaust} onChange={chooseExhaust} />
+            </>
           ) : (
             <p className="sub">Échappement non repéré sur ce modèle : on garde celui d'origine.</p>
           )}

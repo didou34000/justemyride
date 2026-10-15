@@ -70,6 +70,9 @@ export type Config = {
   rims: string;
   rimColor: string; // id de wheelColors ou "origine"
   exhaust: string;
+  /** Pièces Sketchfab choisies : nom + lien, pour l'usine. */
+  rimPart?: string;
+  exhaustPart?: string;
   caliper: string; // id de caliperColors ou "origine"
   size: string;
   accessories: string[];

@@ -306,3 +306,15 @@ a.car-card:hover { border-color: #5a5a60; transform: translateY(-2px); }
 .fix { padding: 20px 0 4px; border-bottom: 1px solid var(--line); }
 .fix .sub { margin-top: 0; }
 .viewer.picking { cursor: crosshair; outline: 1px dashed #6a6a70; }
+
+/* Pièces Sketchfab */
+.part { margin-top: 6px; }
+.search-input.small { font-size: 14px; padding: 11px 14px; border-radius: 10px; }
+.part-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.part-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; text-align: left; background: var(--bg-2); }
+.part-card:hover:not(:disabled) { border-color: #5a5a60; }
+.part-card:disabled { opacity: .6; }
+.part-card img, .part-card .noimg { width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+.part-card span { font-size: 11px; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.part-chosen { margin-bottom: 12px; }
+.part-chosen strong { color: var(--text); font-weight: 500; }

@@ -49,21 +49,28 @@ export function toHit(r: Raw): SketchfabHit {
   };
 }
 
-export async function search(q: string): Promise<SketchfabHit[]> {
+export type SearchKind = "car" | "rim" | "exhaust";
+
+/** Mots ajoutés à la recherche pour les pièces, et taille max (Mo) acceptée. */
+const KIND: Record<SearchKind, { extra: string; maxMb: number; category?: string }> = {
+  car: { extra: "", maxMb: 80, category: "cars-vehicles" },
+  rim: { extra: "rim", maxMb: 30 },
+  exhaust: { extra: "exhaust tip", maxMb: 20 },
+};
+
+export async function search(q: string, kind: SearchKind = "car"): Promise<SketchfabHit[]> {
+  const k = KIND[kind];
+  const query = k.extra && !new RegExp(k.extra.split(" ")[0], "i").test(q) ? `${q} ${k.extra}` : q;
   const url = new URL(`${API}/search`);
-  url.search = new URLSearchParams({
-    type: "models",
-    q,
-    downloadable: "true",
-    categories: "cars-vehicles",
-    count: "24",
-  }).toString();
+  const params: Record<string, string> = { type: "models", q: query, downloadable: "true", count: "24" };
+  if (k.category) params.categories = k.category;
+  url.search = new URLSearchParams(params).toString();
   const res = await fetch(url, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error(`Recherche Sketchfab : ${res.status}`);
   const json = (await res.json()) as { results?: Raw[] };
   return (json.results ?? [])
     .map(toHit)
-    .filter((h) => licenceOk(h.licence) && (h.sizeMb ?? 0) <= 80);
+    .filter((h) => licenceOk(h.licence) && (h.sizeMb ?? 0) <= k.maxMb);
 }
 
 export async function model(uid: string) {

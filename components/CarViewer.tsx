@@ -6,6 +6,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { unzipSync } from "fflate";
+import { normalizeRim, normalizeTip, placeRims, placeTips, tint, type PartAdjust } from "./partFit";
 import { caliperColors, ORIGINE, wheelColors, type Config } from "@/lib/options";
 
 /*
@@ -30,7 +31,10 @@ const STANDARD: Roles = {
 export type Caps = { paint: boolean; rims: boolean; rimStyles: boolean; calipers: boolean; exhaust: boolean };
 export type PickRole = "paint" | "rims" | "calipers";
 
-type Wheel = { center: THREE.Vector3; radius: number; width: number; side: number };
+type Wheel = { center: THREE.Vector3; radius: number; tyreRadius: number; width: number; side: number };
+/** Pièce Sketchfab choisie par le client (jante ou sortie d'échappement). */
+export type PartChoice = { url: string; zip?: boolean; adjust: PartAdjust };
+export const SKETCHFAB = "sketchfab";
 type Tip = { center: THREE.Vector3; radius: number; rearZ: number };
 type Mat = THREE.MeshStandardMaterial;
 
@@ -45,6 +49,9 @@ type Rig = {
   tips: Tip[];
   rimGroup: THREE.Group;
   exhaustGroup: THREE.Group;
+  partRim: THREE.Group;
+  partExhaust: THREE.Group;
+  hideTyres: boolean;
   built: { rims: string; rimColor: string; exhaust: string };
 };
 
@@ -56,25 +63,31 @@ export default function CarViewer({
   pick,
   onCaps,
   onPicked,
+  parts,
+  onPartStatus,
 }: {
   source: ModelSource;
   config: Config;
   pick?: PickRole | null;
   onCaps?: (c: Caps) => void;
   onPicked?: () => void;
+  parts?: { rim?: PartChoice | null; exhaust?: PartChoice | null };
+  /** "" = posée, "loading", ou un message d'erreur. */
+  onPartStatus?: (kind: "rim" | "exhaust", status: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const rig = useRef<Rig | null>(null);
   const configRef = useRef(config);
   const pickRef = useRef(pick);
-  const cb = useRef({ onCaps, onPicked });
+  const cb = useRef({ onCaps, onPicked, onPartStatus });
+  const partCache = useRef(new Map<string, Promise<THREE.Group>>());
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState("");
   const [touched, setTouched] = useState(false);
   configRef.current = config;
   pickRef.current = pick;
-  cb.current = { onCaps, onPicked };
+  cb.current = { onCaps, onPicked, onPartStatus };
 
   useEffect(() => {
     const el = host.current;
@@ -180,6 +193,72 @@ export default function CarViewer({
   useEffect(() => {
     if (ready && rig.current) apply(rig.current, config);
   }, [ready, config]);
+
+  const getPart = (p: PartChoice) => {
+    let pr = partCache.current.get(p.url);
+    if (!pr) {
+      pr = load({ url: p.url, zip: p.zip }, () => {});
+      partCache.current.set(p.url, pr);
+      pr.catch(() => partCache.current.delete(p.url));
+    }
+    return pr;
+  };
+
+  // Jante Sketchfab : chargée une fois, puis posée sur les 4 roues.
+  const rimKey = parts?.rim ? JSON.stringify(parts.rim) : "";
+  useEffect(() => {
+    const r = rig.current;
+    const choice = parts?.rim;
+    if (!ready || !r) return;
+    r.partRim.clear();
+    r.hideTyres = false;
+    apply(r, configRef.current);
+    if (!choice) return;
+    let cancelled = false;
+    cb.current.onPartStatus?.("rim", "loading");
+    getPart(choice)
+      .then((scene) => {
+        if (cancelled) return;
+        const n = normalizeRim(scene.clone(true), choice.adjust);
+        if (typeof n === "string") return cb.current.onPartStatus?.("rim", n);
+        placeRims(n, r.wheels, choice.adjust, r.partRim);
+        tint(r.partRim, wheelColors.find((x) => x.id === configRef.current.rimColor)?.hex ?? null);
+        r.hideTyres = !!n.fullWheel;
+        apply(r, configRef.current);
+        cb.current.onPartStatus?.("rim", "");
+      })
+      .catch((e: Error) => !cancelled && cb.current.onPartStatus?.("rim", `téléchargement impossible (${e.message})`));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, rimKey, config.rimColor]);
+
+  // Sortie d'échappement Sketchfab : posée sur chaque sortie d'origine.
+  const exKey = parts?.exhaust ? JSON.stringify(parts.exhaust) : "";
+  useEffect(() => {
+    const r = rig.current;
+    const choice = parts?.exhaust;
+    if (!ready || !r) return;
+    r.partExhaust.clear();
+    if (!choice) return;
+    let cancelled = false;
+    cb.current.onPartStatus?.("exhaust", "loading");
+    getPart(choice)
+      .then((scene) => {
+        if (cancelled) return;
+        const n = normalizeTip(scene.clone(true), choice.adjust);
+        if (typeof n === "string") return cb.current.onPartStatus?.("exhaust", n);
+        placeTips(n, r.tips, choice.adjust, r.partExhaust);
+        apply(r, configRef.current);
+        cb.current.onPartStatus?.("exhaust", "");
+      })
+      .catch((e: Error) => !cancelled && cb.current.onPartStatus?.("exhaust", `téléchargement impossible (${e.message})`));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, exKey]);
 
   return (
     <div className={`viewer ${pick ? "picking" : ""}`} ref={host}>
@@ -348,13 +427,15 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
 
   const rimGroup = new THREE.Group();
   const exhaustGroup = new THREE.Group();
-  scene.add(rimGroup, exhaustGroup);
+  const partRim = new THREE.Group();
+  const partExhaust = new THREE.Group();
+  scene.add(rimGroup, exhaustGroup, partRim, partExhaust);
 
   const r: Rig = {
     scene, meshes: kept, original, roles,
     paintMat: new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide }),
     originalPaint: new THREE.Color("#888"),
-    wheels: [], tips: [], rimGroup, exhaustGroup,
+    wheels: [], tips: [], rimGroup, exhaustGroup, partRim, partExhaust, hideTyres: false,
     built: { rims: "", rimColor: "", exhaust: "" },
   };
   const paint = [...roles.paint][0];
@@ -372,12 +453,15 @@ function readAnchors(r: Rig, model: THREE.Object3D) {
   const tips: Tip[] = [];
   model.updateMatrixWorld(true);
   model.traverse((o) => {
-    const d = o.userData as { radius?: number; width?: number };
+    const d = o.userData as { radius?: number; width?: number; tyre_radius?: number };
     if (!d.radius) return;
     const pos = o.getWorldPosition(new THREE.Vector3());
     const scale = o.getWorldScale(new THREE.Vector3()).x;
     if (o.name.startsWith("JMR_Wheel")) {
-      wheels.push({ center: pos, radius: d.radius * scale, width: (d.width ?? 0.22) * scale, side: Math.sign(pos.x) });
+      wheels.push({
+        center: pos, radius: d.radius * scale, tyreRadius: (d.tyre_radius ?? d.radius * 1.3) * scale,
+        width: (d.width ?? 0.22) * scale, side: Math.sign(pos.x),
+      });
     } else if (o.name.startsWith("JMR_Exhaust")) {
       tips.push({ center: pos, radius: d.radius * scale, rearZ: pos.z });
     }
@@ -500,7 +584,8 @@ function measureWheels(r: Rig) {
     const center = outer.getCenter(new THREE.Vector3());
     // Garde-fou : une « roue » de taille absurde vient d'une mauvaise détection.
     if (radius < 0.12 || radius > 0.5 || center.y > 0.8) continue;
-    wheels.push({ center, radius, width: outer.getSize(new THREE.Vector3()).x, side: Math.sign(center.x) });
+    const outerSize = outer.getSize(new THREE.Vector3());
+    wheels.push({ center, radius, tyreRadius: Math.max(outerSize.y, outerSize.z) / 2, width: outerSize.x, side: Math.sign(center.x) });
   }
   r.wheels = wheels.length >= 2 && wheels.length <= 4 ? wheels : [];
   r.built.rims = "";
@@ -570,7 +655,8 @@ function apply(r: Rig, c: Config, force = false) {
 
   // Jantes
   const rimHex = wheelColors.find((x) => x.id === c.rimColor)?.hex ?? null;
-  const stock = c.rims === ORIGINE || r.wheels.length === 0;
+  const custom = c.rims === SKETCHFAB && r.wheels.length > 0;
+  const stock = !custom && (c.rims === ORIGINE || r.wheels.length === 0);
   for (const m of meshesOf(r, r.roles.rims)) m.visible = stock;
   if (stock) {
     recolor(r, r.roles.rims, rimHex, (m) => {
@@ -580,7 +666,7 @@ function apply(r: Rig, c: Config, force = false) {
   }
   if (force || r.built.rims !== c.rims || r.built.rimColor !== c.rimColor) {
     clear(r.rimGroup);
-    if (!stock) {
+    if (!stock && !custom) {
       const mat = new THREE.MeshStandardMaterial({
         color: rimHex ?? SILVER, metalness: 0.9, roughness: 0.28, side: THREE.DoubleSide,
       });
@@ -590,12 +676,17 @@ function apply(r: Rig, c: Config, force = false) {
     r.built.rimColor = c.rimColor;
   }
 
+  r.partRim.visible = custom;
+  for (const m of meshesOf(r, r.roles.tyres)) m.visible = !(custom && r.hideTyres);
+
   // Échappement
-  const stockEx = c.exhaust === ORIGINE || r.tips.length === 0;
+  const customEx = c.exhaust === SKETCHFAB && r.tips.length > 0;
+  const stockEx = !customEx && (c.exhaust === ORIGINE || r.tips.length === 0);
+  r.partExhaust.visible = customEx;
   for (const m of meshesOf(r, r.roles.exhaust)) m.visible = stockEx;
   if (force || r.built.exhaust !== c.exhaust) {
     clear(r.exhaustGroup);
-    if (!stockEx) for (const t of r.tips) r.exhaustGroup.add(buildExhaust(c.exhaust, t));
+    if (!stockEx && !customEx) for (const t of r.tips) r.exhaustGroup.add(buildExhaust(c.exhaust, t));
     r.built.exhaust = c.exhaust;
   }
 }

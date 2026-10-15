@@ -33,8 +33,8 @@ export async function createCheckout(c: Config): Promise<string> {
     ...(c.source ? [{ key: "Modèle 3D", value: c.source }] : []),
     { key: "Couleur", value: c.paint === "origine" ? "D'origine" : `${c.paintName} (${c.paint})` },
     { key: "Finition", value: c.finish },
-    { key: "Jantes", value: `${label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },
-    { key: "Échappement", value: label(exhausts, c.exhaust) },
+    { key: "Jantes", value: `${c.rimPart ?? label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },
+    { key: "Échappement", value: c.exhaustPart ?? label(exhausts, c.exhaust) },
     { key: "Étriers", value: label(caliperColors, c.caliper) },
   ];
 
