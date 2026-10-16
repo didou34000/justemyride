@@ -2,16 +2,21 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
 import CarSearch from "@/components/CarSearch";
+import Footer from "@/components/Footer";
 
 export const metadata = { title: "Choisis ta voiture — JustMyRide" };
 
 export default function GaragePage() {
   return (
     <main>
-      <Nav link={{ href: "/#deposer", label: "Envoyer ma voiture" }} />
-      <section className="garage">
+      <Nav cta={{ href: "/envoyer", label: "Envoyer ma voiture" }} />
+      <section className="garage wrap">
         <p className="eyebrow">Étape 1 · La base</p>
-        <h2>Choisis ta voiture</h2>
+        <h2>
+          Choisis ta
+          <br />
+          voiture
+        </h2>
         <p className="lead">
           Tu choisis ici seulement le modèle de base. Jantes, échappement et couleur se règlent à l'étape suivante, sur
           ta miniature en 3D.
@@ -45,9 +50,9 @@ export default function GaragePage() {
             )
           )}
         </div>
-        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/#deposer" className="link">Envoie-nous des photos</Link>.</p>
+        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/envoyer" className="link">Envoie-nous des photos</Link>.</p>
       </section>
-      <footer className="foot">© {new Date().getFullYear()} JustMyRide</footer>
+      <Footer />
     </main>
   );
 }

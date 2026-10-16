@@ -29,7 +29,7 @@ export const cars: Car[] = [
     make: "BMW",
     model: "M140i",
     years: "2016 – 2019",
-    thumb: "/cars/bmw-m140i.jpg",
+    thumb: "/shop/origine_34_avant.jpg",
     available: true,
     glb: "/models/bmw-m140i.glb",
     lengthM: 4.32,
