@@ -22,8 +22,8 @@ export default function HeroReveal({ car, from }: { car: Car; from: number }) {
       const span = r.height - window.innerHeight;
       const p = span > 0 ? Math.min(1, Math.max(0, -r.top / span)) : 0;
       el.style.setProperty("--p", p.toFixed(3));
-      // La miniature ne capte la souris qu'une fois la photo effacée.
-      el.classList.toggle("live", p > 0.85);
+      // La miniature se fait tourner dès que la photo est effacée (opacité 0 à p ≈ 0,55, voir globals.css).
+      el.classList.toggle("live", p > 0.5);
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);

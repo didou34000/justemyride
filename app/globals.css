@@ -75,9 +75,10 @@ h1 span { color: var(--muted); font-weight: 400; }
 .reveal.live .reveal-mini .viewer { pointer-events: auto; }
 /* Sur mobile, glisser à l'horizontale fait tourner la voiture, à la verticale fait défiler la page. */
 .reveal-mini .viewer canvas { touch-action: pan-y !important; }
-.reveal-mini .viewer-hint { bottom: 4px; }
+.reveal-mini .viewer-hint { bottom: 4px; transition: opacity .3s; }
+.reveal:not(.live) .reveal-mini .viewer-hint { opacity: 0; }
 .reveal-photo {
-  opacity: clamp(0, calc(1.6 - var(--p) * 2.4), 1);
+  opacity: clamp(0, calc(1.5 - var(--p) * 2.75), 1);
   pointer-events: none;
 }
 .reveal-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(calc(1 + var(--p) * 0.12)); }
@@ -85,7 +86,7 @@ h1 span { color: var(--muted); font-weight: 400; }
 .reveal-copy { position: absolute; left: clamp(20px, 4vw, 48px); bottom: clamp(24px, 5vh, 48px); z-index: 1; }
 .reveal-copy h1 { font-size: clamp(48px, 8vw, 104px); }
 .reveal-copy.light { color: #fff; }
-.reveal-copy.dark { opacity: clamp(0, calc(var(--p) * 2.4 - 1), 1); transform: translateY(calc((1 - var(--p)) * 24px)); }
+.reveal-copy.dark { opacity: clamp(0, calc(var(--p) * 4 - 1.6), 1); transform: translateY(calc((1 - var(--p)) * 24px)); }
 .reveal-actions { display: flex; align-items: center; gap: 22px; margin-top: 22px; }
 .reveal-price { margin-top: 14px; font-size: 13px; color: var(--muted); }
 .reveal-scroll { position: absolute; right: clamp(20px, 4vw, 48px); bottom: clamp(28px, 5vh, 52px); z-index: 1; color: #fff; font-size: 22px; animation: nudge 2s ease-in-out infinite; }
