@@ -147,7 +147,7 @@ export default function Uploader() {
   const angle = step < ANGLES.length ? ANGLES[step] : null;
 
   return (
-    <div className="up-card wizard" id="deposer">
+    <div className="up-card wizard">
       <div className="wz-head">
         <span>
           {angle ? `Photo ${step + 1} sur ${ANGLES.length}` : step === DETAILS_STEP ? "Détails" : "Dernière étape"}
@@ -184,7 +184,6 @@ export default function Uploader() {
 
           <h2 className="wz-title">{angle.label}</h2>
           <p className="wz-tip">{angle.tip}</p>
-          <p className="wz-tip small">À hauteur des phares, à 3 ou 4 mètres, toute la voiture dans le cadre.</p>
 
           <label className="cta full file-btn">
             <input

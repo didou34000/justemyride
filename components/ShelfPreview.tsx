@@ -27,5 +27,5 @@ export default function ShelfPreview({ car }: { car: Car }) {
     }),
     [car]
   );
-  return <CarViewer source={source} config={config} framing={1.4} />;
+  return <CarViewer source={source} config={config} framing={1.4} interactive={false} />;
 }

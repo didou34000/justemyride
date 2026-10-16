@@ -1,75 +1,78 @@
 import * as THREE from "three";
 
 /*
- * Mise en scène de la miniature : la voiture (sol à y = 0) posée sur un socle,
- * lui-même posé sur une étagère en bois. Le mur derrière est le fond CSS du lecteur.
+ * Mise en scène de la miniature : la voiture (sol à y = 0) posée sur un socle rond.
+ * Le mur derrière est le fond CSS du lecteur.
  * Le socle et la vitrine suivent les finitions choisies par le client.
  */
 
 export type DisplayOptions = { socle: boolean; vitrine: boolean; label: string };
 
-const PLINTH_H = 0.32;
-const SHELF_H = 0.28;
+const PLINTH_H = 0.34;
+const EDGE = 0.06;
 
 export function buildDisplay(car: THREE.Vector3, opts: DisplayOptions) {
   const group = new THREE.Group();
-  const w = car.x * 1.3 + 0.35;
-  const d = car.z * 1.1 + 0.35;
+  const r = Math.hypot(car.x, car.z) / 2 + 0.25;
 
-  // Étagère : une planche de chêne clair, assez large pour sortir du cadre.
-  const shelfMat = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.75, metalness: 0 });
-  const shelf = new THREE.Mesh(new THREE.BoxGeometry(d * 9, SHELF_H, w * 1.45), shelfMat);
-  shelf.rotation.y = Math.PI / 2;
-  shelf.position.y = -PLINTH_H - SHELF_H / 2;
-  group.add(shelf);
-
-  // Socle : laqué noir avec plaque gravée en option, sinon bois clair mat.
+  // Socle rond aux arêtes adoucies : laqué noir avec plaque gravée en option, sinon blanc mat.
   const plinthMat = opts.socle
-    ? new THREE.MeshPhysicalMaterial({ color: "#121212", roughness: 0.32, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.25 })
-    : new THREE.MeshStandardMaterial({ color: "#efebe4", roughness: 0.85, metalness: 0 });
-  const plinth = new THREE.Mesh(roundedBox(w, PLINTH_H, d, 0.05), plinthMat);
-  plinth.position.y = -PLINTH_H / 2;
+    ? new THREE.MeshPhysicalMaterial({ color: "#121212", roughness: 0.3, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.2 })
+    : new THREE.MeshStandardMaterial({ color: "#f1eee8", roughness: 0.8, metalness: 0 });
+  const plinth = new THREE.Mesh(roundPlinth(r, PLINTH_H), plinthMat);
   group.add(plinth);
 
   if (opts.socle) {
+    // Plaque cintrée qui suit le bord du socle, face à l'avant de la voiture.
+    const arc = Math.min(1.8 / r, 0.9);
     const plate = new THREE.Mesh(
-      new THREE.PlaneGeometry(Math.min(w * 0.42, 2.2), PLINTH_H * 0.5),
+      new THREE.CylinderGeometry(r + 0.004, r + 0.004, PLINTH_H * 0.42, 48, 1, true, -arc / 2, arc),
       new THREE.MeshStandardMaterial({ map: plateTexture(opts.label), metalness: 0.6, roughness: 0.35 })
     );
-    plate.position.set(0, -PLINTH_H / 2, d / 2 + 0.002);
+    plate.position.y = -PLINTH_H / 2;
     group.add(plate);
   }
 
-  // Ombre du socle sur l'étagère.
+  // Ombre douce sous le socle.
   const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(w * 1.35, d * 1.6),
-    new THREE.MeshBasicMaterial({ map: softShadow(), transparent: true, depthWrite: false, opacity: 0.55 })
+    new THREE.PlaneGeometry(r * 3, r * 3),
+    new THREE.MeshBasicMaterial({ map: softShadow(), transparent: true, depthWrite: false, opacity: 0.5 })
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = -PLINTH_H + 0.002;
   group.add(shadow);
 
-  // Vitrine : un capot en acrylique posé sur le socle.
+  // Vitrine : une cloche cylindrique en acrylique posée sur le socle.
   if (opts.vitrine) {
-    const h = car.y * 1.3 + 0.2;
-    const box = new THREE.BoxGeometry(w - 0.12, h, d - 0.12);
+    const h = car.y * 1.35 + 0.2;
+    const geo = new THREE.CylinderGeometry(r - 0.08, r - 0.08, h, 96, 1, false);
     const glass = new THREE.Mesh(
-      box,
+      geo,
       new THREE.MeshPhysicalMaterial({
-        color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1,
+        color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12,
         clearcoat: 1, side: THREE.DoubleSide, depthWrite: false,
       })
     );
-    glass.position.y = h / 2;
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(box),
-      new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.55 })
+    const rims = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo, 30),
+      new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.7 })
     );
-    edges.position.y = h / 2;
-    group.add(glass, edges);
+    glass.position.y = rims.position.y = h / 2;
+    group.add(glass, rims);
   }
 
   return group;
+}
+
+/** Profil tourné autour de Y : fond plat, flanc droit, arête supérieure arrondie, dessus à y = 0. */
+function roundPlinth(r: number, h: number) {
+  const pts = [new THREE.Vector2(0, -h), new THREE.Vector2(r - 0.02, -h), new THREE.Vector2(r, -h + 0.02), new THREE.Vector2(r, -EDGE)];
+  for (let i = 1; i <= 8; i++) {
+    const a = (i / 8) * (Math.PI / 2);
+    pts.push(new THREE.Vector2(r - EDGE + Math.cos(a) * EDGE, -EDGE + Math.sin(a) * EDGE));
+  }
+  pts.push(new THREE.Vector2(0, 0));
+  return new THREE.LatheGeometry(pts, 128);
 }
 
 export function disposeDisplay(group: THREE.Group) {
@@ -81,51 +84,6 @@ export function disposeDisplay(group: THREE.Group) {
     mat.map?.dispose();
     mat.dispose();
   });
-}
-
-function roundedBox(w: number, h: number, d: number, r: number) {
-  const s = new THREE.Shape();
-  const x = w / 2, z = d / 2;
-  s.moveTo(-x + r, -z);
-  s.lineTo(x - r, -z);
-  s.quadraticCurveTo(x, -z, x, -z + r);
-  s.lineTo(x, z - r);
-  s.quadraticCurveTo(x, z, x - r, z);
-  s.lineTo(-x + r, z);
-  s.quadraticCurveTo(-x, z, -x, z - r);
-  s.lineTo(-x, -z + r);
-  s.quadraticCurveTo(-x, -z, -x + r, -z);
-  const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2 });
-  g.rotateX(-Math.PI / 2);
-  g.translate(0, -h / 2, 0);
-  return g;
-}
-
-function woodTexture() {
-  const c = document.createElement("canvas");
-  c.width = 1024;
-  c.height = 128;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#c9ab84";
-  g.fillRect(0, 0, c.width, c.height);
-  // Veines : fines lignes ondulées, plus ou moins sombres.
-  for (let i = 0; i < 70; i++) {
-    const y = Math.random() * c.height;
-    const a = 0.04 + Math.random() * 0.08;
-    g.strokeStyle = Math.random() > 0.5 ? `rgba(110,74,40,${a})` : `rgba(255,240,215,${a})`;
-    g.lineWidth = 0.6 + Math.random() * 1.8;
-    g.beginPath();
-    const f = 0.004 + Math.random() * 0.01;
-    const amp = 1 + Math.random() * 4;
-    for (let x = 0; x <= c.width; x += 16) g.lineTo(x, y + Math.sin(x * f + i) * amp);
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(3, 1);
-  t.anisotropy = 4;
-  return t;
 }
 
 function plateTexture(label: string) {
