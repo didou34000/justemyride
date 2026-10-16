@@ -2,6 +2,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
 import CarSearch from "@/components/CarSearch";
+import { LogoMark } from "@/components/Logo";
 
 export const metadata = { title: "Choisis ta voiture — JustMyRide" };
 
@@ -33,7 +34,9 @@ export default function GaragePage() {
               </Link>
             ) : (
               <Link key={car.slug} href="/#deposer" className="car-card soon">
-                <img src={car.thumb} alt="" />
+                <div className="noimg soon-mark">
+                  <LogoMark size={56} />
+                </div>
                 <div className="car-card-body">
                   <strong>
                     {car.make} {car.model}

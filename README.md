@@ -13,7 +13,7 @@ npm run dev
 ## Ce que fait le site
 
 - **Accueil (`/`)** : parcours photo guidé, une étape par angle. 8 photos en faisant le tour de la voiture (4 faces + 4 trois-quarts) : pour chaque angle, une voiture modèle montre le cadrage attendu, avec un plan vu de dessus indiquant où se placer. Après chaque photo, le parcours passe tout seul à l'angle suivant. Puis jusqu'à 4 photos de détail (facultatif), puis voiture + email. Les 4 faces sont l'entrée idéale des IA multi-vues (Tripo, Meshy), les 3/4 servent au choix des meilleures vues et à la retouche Blender.
-- Les images d'exemple (`public/guide/*.png`) sont rendues avec three.js depuis `tools/guide-render.html` (voiture générique, aucune marque).
+- Les photos d'exemple (`public/guide/*.jpg`, une par angle) sont générées par IA : même voiture grise, même parking.
 - Les fichiers partent directement du navigateur vers **Vercel Blob** (jusqu'à 500 Mo par fichier), dans `submissions/<date>-<id>/`, avec un `demande.json` (email, voiture, liste des fichiers).
 - Sans stockage branché, l'envoi est simulé (« mode démo »).
 

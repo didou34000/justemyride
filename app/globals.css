@@ -179,7 +179,7 @@ input:focus { border-color: var(--text); }
 .car-card-body span { font-size: 13px; color: var(--muted); }
 .car-card-go { position: absolute; top: 12px; right: 12px; font-style: normal; font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--bg); color: var(--text); font-weight: 500; }
 a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
-.car-card.soon img { object-fit: contain; opacity: .55; filter: grayscale(1); }
+.soon-mark { display: grid; place-items: center; color: var(--line-strong); }
 .car-card.soon .car-card-go { background: transparent; border: 1px solid var(--line); color: var(--muted); }
 .noimg { aspect-ratio: 4/3; background: var(--wall); }
 .garage-sub { margin: 0 0 14px; }

@@ -168,13 +168,13 @@ export default function Uploader() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="frame-photo" src={previews[angle.id]} alt={`Ta photo : ${angle.label}`} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="frame-inset" src={`/guide/${angle.id}.png`} alt="" />
+                <img className="frame-inset" src={`/guide/${angle.id}.jpg`} alt="" />
                 {justAdded && <div className="frame-ok">✓</div>}
               </>
             ) : (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="frame-guide" src={`/guide/${angle.id}.png`} alt={`Exemple : ${angle.label}`} />
+                <img className="frame-guide" src={`/guide/${angle.id}.jpg`} alt={`Exemple : ${angle.label}`} />
                 <div className="frame-map">
                   <AngleIcon angle={angle.id} />
                 </div>

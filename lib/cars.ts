@@ -9,7 +9,8 @@ export type Car = {
   make: string;
   model: string;
   years: string;
-  thumb: string;
+  /** Photo de la carte du garage (modèles disponibles). */
+  thumb?: string;
   available: boolean;
   glb?: string;
   /** Longueur réelle en mètres, pour mettre le modèle à l'échelle. */
@@ -41,10 +42,10 @@ export const cars: Car[] = [
       tyres: ["iTyres1"],
     },
   },
-  { slug: "vw-golf-gti", make: "Volkswagen", model: "Golf GTI", years: "Mk7", thumb: "/guide/avant-gauche.png", available: false },
-  { slug: "renault-clio-rs", make: "Renault", model: "Clio RS", years: "IV", thumb: "/guide/avant-gauche.png", available: false },
-  { slug: "mini-cooper-s", make: "Mini", model: "Cooper S", years: "F56", thumb: "/guide/avant-gauche.png", available: false },
-  { slug: "peugeot-208-gti", make: "Peugeot", model: "208 GTi", years: "2013 – 2019", thumb: "/guide/avant-gauche.png", available: false },
+  { slug: "vw-golf-gti", make: "Volkswagen", model: "Golf GTI", years: "Mk7", available: false },
+  { slug: "renault-clio-rs", make: "Renault", model: "Clio RS", years: "IV", available: false },
+  { slug: "mini-cooper-s", make: "Mini", model: "Cooper S", years: "F56", available: false },
+  { slug: "peugeot-208-gti", make: "Peugeot", model: "208 GTi", years: "2013 – 2019", available: false },
 ];
 
 export function carBySlug(slug: string) {
