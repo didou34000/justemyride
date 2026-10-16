@@ -6,6 +6,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { unzipSync } from "fflate";
+import { buildDisplay, disposeDisplay } from "./display";
 import { normalizeRim, normalizeTip, placeRims, placeTips, tint, type PartAdjust } from "./partFit";
 import { caliperColors, ORIGINE, wheelColors, type Config } from "@/lib/options";
 
@@ -52,6 +53,9 @@ type Rig = {
   partRim: THREE.Group;
   partExhaust: THREE.Group;
   hideTyres: boolean;
+  /** Dimensions de la voiture, pour le socle et la vitrine. */
+  size: THREE.Vector3;
+  display: THREE.Group | null;
   built: { rims: string; rimColor: string; exhaust: string };
 };
 
@@ -65,6 +69,7 @@ export default function CarViewer({
   onPicked,
   parts,
   onPartStatus,
+  framing = 1,
 }: {
   source: ModelSource;
   config: Config;
@@ -74,6 +79,8 @@ export default function CarViewer({
   parts?: { rim?: PartChoice | null; exhaust?: PartChoice | null };
   /** "" = posée, "loading", ou un message d'erreur. */
   onPartStatus?: (kind: "rim" | "exhaust", status: string) => void;
+  /** > 1 recule la caméra (aperçu plus petit, plus de décor). */
+  framing?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const rig = useRef<Rig | null>(null);
@@ -109,11 +116,11 @@ export default function CarViewer({
 
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.55, 0);
+    controls.target.set(0, 0.4, 0);
     controls.enableDamping = true;
     controls.enablePan = false;
     controls.minDistance = 4;
-    controls.maxDistance = 16;
+    controls.maxDistance = 16 * framing;
     controls.minPolarAngle = 0.25;
     controls.maxPolarAngle = Math.PI * 0.485;
     controls.autoRotate = true;
@@ -133,7 +140,7 @@ export default function CarViewer({
     };
     // Vue de 3/4 avant ; on recule sur les écrans étroits pour que la voiture rentre.
     const aspect = el.clientWidth / Math.max(el.clientHeight, 1);
-    const dist = 7.6 * Math.max(1, 1.1 / aspect);
+    const dist = 7.6 * framing * Math.max(1, 1.1 / aspect);
     camera.position.copy(new THREE.Vector3(0.66, 0.17, 0.73).normalize().multiplyScalar(dist)).add(controls.target);
     const ro = new ResizeObserver(resize);
     ro.observe(el);
@@ -193,6 +200,20 @@ export default function CarViewer({
   useEffect(() => {
     if (ready && rig.current) apply(rig.current, config);
   }, [ready, config]);
+
+  // Socle, étagère et vitrine : reconstruits seulement quand les finitions changent.
+  const socle = config.accessories.includes("socle");
+  const vitrine = config.accessories.includes("vitrine");
+  useEffect(() => {
+    const r = rig.current;
+    if (!ready || !r) return;
+    if (r.display) {
+      r.scene.remove(r.display);
+      disposeDisplay(r.display);
+    }
+    r.display = buildDisplay(r.size, { socle, vitrine, label: config.carName });
+    r.scene.add(r.display);
+  }, [ready, socle, vitrine, config.carName]);
 
   const getPart = (p: PartChoice) => {
     let pr = partCache.current.get(p.url);
@@ -418,7 +439,7 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
   g.fillRect(0, 0, 128, 128);
   const size = boxOf(kept).getSize(new THREE.Vector3());
   const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(size.x * 1.7, size.z * 1.3),
+    new THREE.PlaneGeometry(size.x * 1.4, size.z * 1.15),
     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false })
   );
   shadow.rotation.x = -Math.PI / 2;
@@ -435,7 +456,7 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
     scene, meshes: kept, original, roles,
     paintMat: new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide }),
     originalPaint: new THREE.Color("#888"),
-    wheels: [], tips: [], rimGroup, exhaustGroup, partRim, partExhaust, hideTyres: false,
+    wheels: [], tips: [], rimGroup, exhaustGroup, partRim, partExhaust, hideTyres: false, size, display: null,
     built: { rims: "", rimColor: "", exhaust: "" },
   };
   const paint = [...roles.paint][0];
