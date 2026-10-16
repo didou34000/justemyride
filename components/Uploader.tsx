@@ -24,6 +24,7 @@ type Phase = "idle" | "sending" | "done" | "error";
 const DETAILS_STEP = ANGLES.length;
 const CONTACT_STEP = ANGLES.length + 1;
 const MAX_DETAILS = 4;
+const TOUR_MS = 3000;
 
 export default function Uploader() {
   const [step, setStep] = useState(0);
@@ -37,6 +38,10 @@ export default function Uploader() {
   const [storage, setStorage] = useState<boolean | null>(null);
   const [justAdded, setJustAdded] = useState(false);
   const advance = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Visite guidée : tant que le client n'a rien touché, les angles défilent seuls (au premier clic, ça s'arrête).
+  const [tour, setTour] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/storage")
@@ -45,6 +50,20 @@ export default function Uploader() {
       .catch(() => setStorage(false));
     return () => clearTimeout(advance.current);
   }, []);
+
+  useEffect(() => {
+    const el = card.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: "-15% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!tour || !visible) return;
+    const t = setInterval(() => setStep((s) => (s + 1) % ANGLES.length), TOUR_MS);
+    return () => clearInterval(t);
+  }, [tour, visible]);
 
   const previews = useMemo(() => {
     const m: Partial<Record<AngleId, string>> = {};
@@ -147,7 +166,12 @@ export default function Uploader() {
   const angle = step < ANGLES.length ? ANGLES[step] : null;
 
   return (
-    <div className="up-card wizard">
+    <div
+      className="up-card wizard"
+      ref={card}
+      onPointerDown={() => setTour(false)}
+      onKeyDown={() => setTour(false)}
+    >
       <div className="wz-head">
         <span>
           {angle ? `Photo ${step + 1} sur ${ANGLES.length}` : step === DETAILS_STEP ? "Détails" : "Dernière étape"}

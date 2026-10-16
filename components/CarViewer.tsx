@@ -71,6 +71,7 @@ export default function CarViewer({
   onPartStatus,
   framing = 1,
   interactive = true,
+  zoom = true,
 }: {
   source: ModelSource;
   config: Config;
@@ -84,6 +85,8 @@ export default function CarViewer({
   framing?: number;
   /** false : la voiture tourne seule, sans capter la souris (la page défile normalement). */
   interactive?: boolean;
+  /** false : pas de zoom à la molette ou au pincement, pour laisser la page défiler. */
+  zoom?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const rig = useRef<Rig | null>(null);
@@ -123,6 +126,7 @@ export default function CarViewer({
     controls.enableDamping = true;
     controls.enablePan = false;
     controls.enabled = interactive;
+    controls.enableZoom = zoom;
     controls.minDistance = 4;
     controls.maxDistance = 16 * framing;
     controls.minPolarAngle = 0.25;
@@ -292,7 +296,7 @@ export default function CarViewer({
           {failed ? `Le modèle 3D n'a pas pu se charger (${failed}).` : `Chargement du modèle 3D… ${Math.round(progress * 100)} %`}
         </div>
       )}
-      {ready && interactive && !touched && !pick && <p className="viewer-hint">Fais glisser pour tourner · pince ou molette pour zoomer</p>}
+      {ready && interactive && !touched && !pick && <p className="viewer-hint">{zoom ? "Fais glisser pour tourner · pince ou molette pour zoomer" : "Fais-la tourner"}</p>}
     </div>
   );
 }
