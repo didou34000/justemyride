@@ -32,22 +32,22 @@ export default function GaragePage() {
                 <em className="car-card-go">Personnaliser →</em>
               </Link>
             ) : (
-              <div key={car.slug} className="car-card soon" aria-disabled>
+              <Link key={car.slug} href="/#deposer" className="car-card soon">
                 <img src={car.thumb} alt="" />
                 <div className="car-card-body">
                   <strong>
                     {car.make} {car.model}
                   </strong>
-                  <span>{car.years}</span>
+                  <span>{car.years} · en préparation</span>
                 </div>
-                <em className="car-card-go">Bientôt</em>
-              </div>
+                <em className="car-card-go">Demander ce modèle</em>
+              </Link>
             )
           )}
         </div>
         <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/#deposer" className="link">Envoie-nous des photos</Link>.</p>
       </section>
-      <footer className="foot">© {new Date().getFullYear()} JustMyRide</footer>
+      <footer className="foot"><span>© {new Date().getFullYear()} JustMyRide</span></footer>
     </main>
   );
 }
