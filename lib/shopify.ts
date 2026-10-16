@@ -5,21 +5,24 @@ const label = (list: { id: string; label: string }[], id: string) =>
 
 const API_VERSION = "2025-07";
 
+// Boutique et produits créés dans Shopify (« Miniature personnalisée », « Socle noir gravé », « Vitrine acrylique »).
+// Ces identifiants ne sont pas secrets ; les variables d'environnement permettent d'en changer sans toucher au code.
+const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || "jsgvit-dt.myshopify.com";
+
 const sizeVariant: Record<string, string | undefined> = {
-  "1-43": process.env.SHOPIFY_VARIANT_SCALE_43,
-  "1-24": process.env.SHOPIFY_VARIANT_SCALE_24,
-  "1-18": process.env.SHOPIFY_VARIANT_SCALE_18,
+  "1-43": process.env.SHOPIFY_VARIANT_SCALE_43 || "gid://shopify/ProductVariant/54398137041243",
+  "1-24": process.env.SHOPIFY_VARIANT_SCALE_24 || "gid://shopify/ProductVariant/54398137074011",
+  "1-18": process.env.SHOPIFY_VARIANT_SCALE_18 || "gid://shopify/ProductVariant/54398137106779",
 };
 
 const extraVariant: Record<string, string | undefined> = {
-  socle: process.env.SHOPIFY_VARIANT_BASE,
-  vitrine: process.env.SHOPIFY_VARIANT_CASE,
+  socle: process.env.SHOPIFY_VARIANT_BASE || "gid://shopify/ProductVariant/54398137139547",
+  vitrine: process.env.SHOPIFY_VARIANT_CASE || "gid://shopify/ProductVariant/54398137205083",
 };
 
+/** Seule la clé Storefront (secrète) reste à fournir, sur Vercel. Sans elle : mode démo. */
 export function shopifyConfigured() {
-  return Boolean(
-    process.env.SHOPIFY_STORE_DOMAIN && process.env.SHOPIFY_STOREFRONT_TOKEN
-  );
+  return Boolean(process.env.SHOPIFY_STOREFRONT_TOKEN);
 }
 
 /** Crée un panier Shopify et renvoie l'URL de paiement hébergée par Shopify. */
@@ -45,7 +48,7 @@ export async function createCheckout(c: Config): Promise<string> {
   }
 
   const res = await fetch(
-    `https://${process.env.SHOPIFY_STORE_DOMAIN}/api/${API_VERSION}/graphql.json`,
+    `https://${STORE_DOMAIN}/api/${API_VERSION}/graphql.json`,
     {
       method: "POST",
       headers: {

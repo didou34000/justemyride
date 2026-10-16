@@ -39,10 +39,10 @@ npm run dev
 
 ## Brancher Shopify
 
-1. Dans Shopify : créer un produit « Miniature » avec 3 variantes (1:43, 1:24, 1:18), plus un produit par option payante (aileron GT, socle, vitrine).
-2. Créer une app avec accès Storefront API et récupérer le jeton.
-3. Copier `.env.example` en `.env.local` et remplir le domaine, le jeton et les IDs de variantes (`gid://shopify/ProductVariant/...`).
-4. La configuration du client (couleur, jantes, plaque…) est transmise comme attributs de la ligne de panier et apparaît dans la commande Shopify.
+1. Fait : boutique `jsgvit-dt.myshopify.com`, produits « Miniature personnalisée » (1:43, 1:24, 1:18), « Socle noir gravé » et « Vitrine acrylique ». Leurs IDs sont dans `lib/shopify.ts`.
+2. À faire : créer une app Shopify avec accès Storefront API, puis mettre son jeton dans `SHOPIFY_STOREFRONT_TOKEN` (Vercel, ou `.env.local` en local). Sans jeton, le bouton « Commander » reste en mode démo.
+3. Les produits doivent être actifs et publiés sur le canal de vente de l'app pour être achetables.
+4. La configuration du client (couleur, jantes, étriers…) est transmise comme attributs de la ligne de panier et apparaît dans la commande Shopify.
 
 ## Déployer sur Vercel
 
