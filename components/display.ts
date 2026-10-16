@@ -45,19 +45,22 @@ export function buildDisplay(car: THREE.Vector3, opts: DisplayOptions) {
   // Vitrine : une cloche cylindrique en acrylique posée sur le socle.
   if (opts.vitrine) {
     const h = car.y * 1.35 + 0.2;
-    const geo = new THREE.CylinderGeometry(r - 0.08, r - 0.08, h, 96, 1, false);
-    const glass = new THREE.Mesh(
-      geo,
-      new THREE.MeshPhysicalMaterial({
-        color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12,
-        clearcoat: 1, side: THREE.DoubleSide, depthWrite: false,
-      })
-    );
+    // Pas de fond : un fond posé pile sur le socle scintille (z-fighting). Juste le tube et le couvercle.
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12,
+      clearcoat: 1, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const tube = new THREE.CylinderGeometry(r - 0.08, r - 0.08, h, 96, 1, true);
+    const glass = new THREE.Mesh(tube, glassMat);
+    const lid = new THREE.Mesh(new THREE.CircleGeometry(r - 0.08, 96), glassMat);
+    lid.rotation.x = -Math.PI / 2;
+    lid.position.y = h / 2;
+    glass.add(lid);
     const rims = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo, 30),
+      new THREE.EdgesGeometry(tube, 30),
       new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.7 })
     );
-    glass.position.y = rims.position.y = h / 2;
+    glass.position.y = rims.position.y = h / 2 + 0.004;
     group.add(glass, rims);
   }
 
