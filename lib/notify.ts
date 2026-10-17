@@ -15,10 +15,15 @@ export type NewRequest = {
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-export async function notifyNewRequest(r: NewRequest) {
+export function alertsConfigured() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL);
+}
+
+/** Renvoie "sent", ou "off" si les variables manquent. Lève une erreur si Resend refuse. */
+export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
   const key = process.env.RESEND_API_KEY;
   const to = process.env.NOTIFY_EMAIL;
-  if (!key || !to) return;
+  if (!key || !to) return "off";
 
   const car = r.car.trim() || "Voiture non précisée";
   const angles = r.files.filter((f) => !f.slot.startsWith("detail-")).length;
@@ -53,4 +58,5 @@ export async function notifyNewRequest(r: NewRequest) {
     }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status} : ${await res.text()}`);
+  return "sent";
 }
