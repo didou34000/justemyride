@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
+import { notifyNewRequest } from "@/lib/notify";
 
 type Submission = {
   id: string;
@@ -26,6 +27,13 @@ export async function POST(request: Request) {
     JSON.stringify({ ...s, receivedAt: new Date().toISOString() }, null, 2),
     { access: BLOB_ACCESS, contentType: "application/json", addRandomSuffix: false }
   );
+
+  // L'alerte ne doit jamais faire échouer l'envoi : la demande est déjà enregistrée.
+  try {
+    await notifyNewRequest(s);
+  } catch (e) {
+    console.error("Alerte e-mail non envoyée :", (e as Error).message);
+  }
 
   return NextResponse.json({ id: s.id });
 }
