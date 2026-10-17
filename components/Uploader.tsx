@@ -3,6 +3,8 @@
 import { upload, uploadPresigned } from "@vercel/blob/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AngleIcon from "./AngleIcon";
+import CarPicker from "./CarPicker";
+import type { Base } from "@/lib/catalog";
 import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
 
 // Ordre = un tour complet de la voiture. Les 4 faces nourrissent l'IA multi-vues ;
@@ -32,6 +34,8 @@ export default function Uploader() {
   const [details, setDetails] = useState<File[]>([]);
   const [email, setEmail] = useState("");
   const [car, setCar] = useState("");
+  // Étape 0 : la voiture de base, choisie avant les photos.
+  const [base, setBase] = useState<Base | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -64,10 +68,10 @@ export default function Uploader() {
   }, []);
 
   useEffect(() => {
-    if (!tour || !visible) return;
+    if (!tour || !visible || !base) return;
     const t = setInterval(() => setStep((s) => (s + 1) % ANGLES.length), TOUR_MS);
     return () => clearInterval(t);
-  }, [tour, visible]);
+  }, [tour, visible, base]);
 
   const previews = useMemo(() => {
     const m: Partial<Record<AngleId, string>> = {};
@@ -139,7 +143,7 @@ export default function Uploader() {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, email, car, mode: "photos", files: uploaded }),
+        body: JSON.stringify({ id, email, car, base, mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
       setProgress(100);
@@ -169,6 +173,20 @@ export default function Uploader() {
     );
   }
 
+  if (!base) {
+    return (
+      <div className="up-card wizard">
+        <CarPicker
+          onPick={(b) => {
+            setBase(b);
+            setCar(b.label);
+            setStep(0);
+          }}
+        />
+      </div>
+    );
+  }
+
   const angle = step < ANGLES.length ? ANGLES[step] : null;
 
   return (
@@ -178,6 +196,14 @@ export default function Uploader() {
       onPointerDown={() => setTour(false)}
       onKeyDown={() => setTour(false)}
     >
+      <div className="pk-chosen">
+        <span>
+          Ta voiture : <b>{base.label}</b>
+        </span>
+        <button className="link" onClick={() => setBase(null)}>
+          Changer
+        </button>
+      </div>
       <div className="wz-head">
         <span>
           {angle ? `Photo ${step + 1} sur ${ANGLES.length}` : step === DETAILS_STEP ? "Détails" : "Dernière étape"}

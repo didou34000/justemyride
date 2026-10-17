@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { SketchfabHit } from "@/lib/sketchfab";
 
-/** Barre de recherche dans les modèles 3D Sketchfab (seulement ceux qu'on a le droit de vendre). */
-export default function CarSearch() {
-  const [q, setQ] = useState("");
+/**
+ * Barre de recherche dans les modèles 3D Sketchfab (seulement ceux qu'on a le droit de vendre).
+ * Avec onPick, un clic choisit le modèle au lieu d'ouvrir le configurateur.
+ */
+export default function CarSearch({ initial = "", onPick }: { initial?: string; onPick?: (h: SketchfabHit) => void }) {
+  const [q, setQ] = useState(initial);
   const [hits, setHits] = useState<SketchfabHit[]>([]);
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
 
@@ -56,18 +59,29 @@ export default function CarSearch() {
       </p>
       {hits.length > 0 && (
         <div className="garage-grid results">
-          {hits.map((h) => (
-            <Link key={h.uid} href={`/configurer/sketchfab/${h.uid}`} className="car-card">
-              {h.thumb ? <img src={h.thumb} alt="" loading="lazy" /> : <div className="noimg" />}
-              <div className="car-card-body">
-                <strong>{h.name}</strong>
-                <span>
-                  par {h.author}
-                  {h.sizeMb ? ` · ${h.sizeMb} Mo` : ""}
-                </span>
-              </div>
-            </Link>
-          ))}
+          {hits.map((h) => {
+            const body = (
+              <>
+                {h.thumb ? <img src={h.thumb} alt="" loading="lazy" /> : <div className="noimg" />}
+                <div className="car-card-body">
+                  <strong>{h.name}</strong>
+                  <span>
+                    par {h.author}
+                    {h.sizeMb ? ` · ${h.sizeMb} Mo` : ""}
+                  </span>
+                </div>
+              </>
+            );
+            return onPick ? (
+              <button key={h.uid} type="button" className="car-card pick" onClick={() => onPick(h)}>
+                {body}
+              </button>
+            ) : (
+              <Link key={h.uid} href={`/configurer/sketchfab/${h.uid}`} className="car-card">
+                {body}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
