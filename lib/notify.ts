@@ -64,6 +64,16 @@ export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
   // Domaine de l'expéditeur non vérifié sur ce compte Resend : on retente avec l'expéditeur de test de Resend,
   // qui n'écrit qu'à l'adresse du compte (NOTIFY_EMAIL doit donc être l'e-mail du compte Resend).
   if (!res.ok && (res.status === 403 || res.status === 422)) res = await send(FALLBACK_FROM);
-  if (!res.ok) throw new Error(`Resend ${res.status} : ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    const name = (() => {
+      try {
+        return (JSON.parse(body) as { name?: string }).name ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    throw new Error(`Resend ${res.status} ${name} : ${body}`);
+  }
   return "sent";
 }

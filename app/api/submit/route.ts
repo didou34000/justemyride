@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = (e as Error).message;
     console.error("Alerte e-mail non envoyée :", msg);
-    alert = `failed (${msg.match(/^Resend \d+/)?.[0] ?? "erreur"})`;
+    alert = `failed (${msg.match(/^Resend \d+ [\w-]*/)?.[0] ?? "erreur"})`;
   }
 
   return NextResponse.json({ id: s.id, alert });
