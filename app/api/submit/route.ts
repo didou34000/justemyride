@@ -29,12 +29,13 @@ export async function POST(request: Request) {
   );
 
   // L'alerte ne doit jamais faire échouer l'envoi : la demande est déjà enregistrée.
-  let alert: "sent" | "off" | "failed";
+  let alert: string;
   try {
     alert = await notifyNewRequest(s);
   } catch (e) {
-    alert = "failed";
-    console.error("Alerte e-mail non envoyée :", (e as Error).message);
+    const msg = (e as Error).message;
+    console.error("Alerte e-mail non envoyée :", msg);
+    alert = `failed (${msg.match(/^Resend \d+/)?.[0] ?? "erreur"})`;
   }
 
   return NextResponse.json({ id: s.id, alert });

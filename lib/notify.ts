@@ -5,6 +5,7 @@
 
 // Domaine déjà vérifié sur le compte Resend ; à remplacer par justmyride.shop une fois le domaine acheté et vérifié.
 const FROM = process.env.RESEND_FROM || "JustMyRide <alertes@iksee.fr>";
+const FALLBACK_FROM = "JustMyRide <onboarding@resend.dev>";
 
 export type NewRequest = {
   id: string;
@@ -46,17 +47,23 @@ export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
       </p>
     </div>`;
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: FROM,
-      to: [to],
-      reply_to: r.email,
-      subject: `Nouvelle demande : ${car} (${r.files.length} photos)`,
-      html,
-    }),
-  });
+  const send = (from: string) =>
+    fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: r.email,
+        subject: `Nouvelle demande : ${car} (${r.files.length} photos)`,
+        html,
+      }),
+    });
+
+  let res = await send(FROM);
+  // Domaine de l'expéditeur non vérifié sur ce compte Resend : on retente avec l'expéditeur de test de Resend,
+  // qui n'écrit qu'à l'adresse du compte (NOTIFY_EMAIL doit donc être l'e-mail du compte Resend).
+  if (!res.ok && (res.status === 403 || res.status === 422)) res = await send(FALLBACK_FROM);
   if (!res.ok) throw new Error(`Resend ${res.status} : ${await res.text()}`);
   return "sent";
 }
