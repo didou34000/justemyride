@@ -35,7 +35,8 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = (e as Error).message;
     console.error("Alerte e-mail non envoyée :", msg);
-    alert = `failed (${msg.match(/^Resend \d+ [\w-]*/)?.[0] ?? "erreur"})`;
+    // Message Resend sans les adresses e-mail, pour diagnostiquer sans rien exposer.
+    alert = `failed (${msg.replace(/[\w.+-]+@[\w.-]+/g, "***").slice(0, 220)})`;
   }
 
   return NextResponse.json({ id: s.id, alert });
