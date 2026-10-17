@@ -1,9 +1,9 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AngleIcon from "./AngleIcon";
-import { BLOB_ACCESS } from "@/lib/storage";
+import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
 
 // Ordre = un tour complet de la voiture. Les 4 faces nourrissent l'IA multi-vues ;
 // les 3/4 servent à choisir les meilleures vues et à la retouche.
@@ -36,6 +36,7 @@ export default function Uploader() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [storage, setStorage] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<StorageMode | null>(null);
   const [justAdded, setJustAdded] = useState(false);
   const advance = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Visite guidée : tant que le client n'a rien touché, les angles défilent seuls (au premier clic, ça s'arrête).
@@ -46,7 +47,10 @@ export default function Uploader() {
   useEffect(() => {
     fetch("/api/storage")
       .then((r) => r.json())
-      .then((d) => setStorage(Boolean(d.enabled)))
+      .then((d) => {
+        setStorage(Boolean(d.enabled));
+        setMode(d.mode ?? null);
+      })
       .catch(() => setStorage(false));
     return () => clearTimeout(advance.current);
   }, []);
@@ -116,10 +120,12 @@ export default function Uploader() {
       const uploaded = await Promise.all(
         files.map(async ({ slot, file }) => {
           const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-          const blob = await upload(`submissions/${id}/${slot}.${ext}`, file, {
+          // Connexion Blob actuelle (OIDC) : envoi par URL présignée, en une seule requête.
+          const send = mode === "oidc" ? uploadPresigned : upload;
+          const blob = await send(`submissions/${id}/${slot}.${ext}`, file, {
             access: BLOB_ACCESS,
             handleUploadUrl: "/api/upload",
-            multipart: file.size > 20 * 1024 * 1024,
+            multipart: mode === "token" && file.size > 20 * 1024 * 1024,
             onUploadProgress: (e) => {
               loaded[slot] = e.loaded;
               const sum = Object.values(loaded).reduce((a, b) => a + b, 0);

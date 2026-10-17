@@ -1,24 +1,58 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
+import {
+  handleUpload,
+  handleUploadPresigned,
+  type HandleUploadBody,
+  type HandleUploadPresignedBody,
+} from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { MAX_FILE_BYTES, storageEnabled } from "@/lib/storage";
+import { ALLOWED_TYPES, MAX_FILE_BYTES, storageMode } from "@/lib/storage";
 
-/** Délivre un jeton d'envoi direct navigateur → Vercel Blob (pas de limite de taille de requête). */
+/**
+ * Autorise un envoi direct navigateur → Vercel Blob (pas de limite de taille de requête).
+ * Mode "token" : jeton client signé avec BLOB_READ_WRITE_TOKEN.
+ * Mode "oidc"  : URL présignée, obtenue avec le jeton OIDC de Vercel et BLOB_STORE_ID.
+ */
 export async function POST(request: Request) {
-  if (!storageEnabled()) {
+  const mode = storageMode();
+  if (!mode) {
     return NextResponse.json({ error: "Stockage non configuré" }, { status: 503 });
   }
 
-  const body = (await request.json()) as HandleUploadBody;
+  const checkPath = (pathname: string) => {
+    if (!pathname.startsWith("submissions/")) throw new Error("Chemin refusé");
+  };
+
   try {
-    const json = await handleUpload({
+    if (mode === "token") {
+      const body = (await request.json()) as HandleUploadBody;
+      const json = await handleUpload({
+        body,
+        request,
+        onBeforeGenerateToken: async (pathname) => {
+          checkPath(pathname);
+          return { allowedContentTypes: ALLOWED_TYPES, maximumSizeInBytes: MAX_FILE_BYTES, addRandomSuffix: true };
+        },
+      });
+      return NextResponse.json(json);
+    }
+
+    const body = (await request.json()) as HandleUploadPresignedBody;
+    const json = await handleUploadPresigned({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
-        if (!pathname.startsWith("submissions/")) throw new Error("Chemin refusé");
-        return {
-          allowedContentTypes: ["image/*"],
+      getSignedToken: async (pathname) => {
+        checkPath(pathname);
+        const token = await issueSignedToken({
+          pathname,
+          operations: ["put"],
+          allowedContentTypes: ALLOWED_TYPES,
           maximumSizeInBytes: MAX_FILE_BYTES,
-          addRandomSuffix: true,
+          validUntil: Date.now() + 60 * 60 * 1000,
+        });
+        return {
+          token,
+          urlOptions: { allowedContentTypes: ALLOWED_TYPES, maximumSizeInBytes: MAX_FILE_BYTES, addRandomSuffix: true },
         };
       },
     });
