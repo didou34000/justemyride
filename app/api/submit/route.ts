@@ -2,11 +2,13 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 import { notifyNewRequest } from "@/lib/notify";
+import type { Base } from "@/lib/catalog";
 
 type Submission = {
   id: string;
   email: string;
   car: string;
+  base?: Base | null;
   mode: "photos";
   files: { slot: string; url: string; pathname: string }[];
 };

@@ -16,7 +16,7 @@ export default function Home() {
       <HeroReveal car={example} from={from} />
 
       <section className="start" id="deposer">
-        <h2>8 photos, on s'occupe du reste.</h2>
+        <h2>Ta voiture, 8 photos, on s'occupe du reste.</h2>
         <Uploader />
       </section>
 
