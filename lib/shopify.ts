@@ -1,4 +1,4 @@
-import { caliperColors, exhausts, rimStyles, wheelColors, type Config } from "./options";
+import { caliperColors, exhausts, finishes, rimStyles, wheelColors, type Config } from "./options";
 
 const label = (list: { id: string; label: string }[], id: string) =>
   id === "origine" ? "D'origine" : list.find((o) => o.id === id)?.label ?? id;
@@ -35,7 +35,7 @@ export async function createCheckout(c: Config): Promise<string> {
     { key: "Voiture", value: c.carName },
     ...(c.source ? [{ key: "Modèle 3D", value: c.source }] : []),
     { key: "Couleur", value: c.paint === "origine" ? "D'origine" : `${c.paintName} (${c.paint})` },
-    { key: "Finition", value: c.finish },
+    { key: "Finition", value: label(finishes, c.finish) },
     { key: "Jantes", value: `${c.rimPart ?? label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },
     { key: "Échappement", value: c.exhaustPart ?? label(exhausts, c.exhaust) },
     { key: "Étriers", value: label(caliperColors, c.caliper) },
