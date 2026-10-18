@@ -2,6 +2,7 @@ import { list } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
 import { analyseConfigured, type AnalysisRecord } from "@/lib/analyse";
 import type { Job } from "@/lib/meshy";
+import type { DetailsRecord } from "@/lib/details";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
@@ -27,6 +28,7 @@ export type Order = {
   demande: Demande;
   analyse: AnalysisRecord | null;
   meshy: Job | null;
+  details: DetailsRecord | null;
   suivi: Suivi;
   steps: Step[];
   progress: number;
@@ -34,7 +36,14 @@ export type Order = {
 
 const suiviPath = (id: string) => `submissions/${id}/suivi.json`;
 
-export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, s: Suivi, analyseOn = true): Step[] {
+export function buildSteps(
+  d: Demande,
+  a: AnalysisRecord | null,
+  m: Job | null,
+  s: Suivi,
+  analyseOn = true,
+  x: DetailsRecord | null = null
+): Step[] {
   const needsParts = a?.result?.differences.some((x) => x.traitement === "piece_3d");
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
@@ -56,6 +65,18 @@ export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, 
       if (a?.status === "done" && !needsParts) return { ...base, state: "skip" as const, note: "aucune pièce à faire" };
       return { ...base, state: "todo" as const };
     }
+    if (def.key === "details") {
+      if (!x) {
+        if (m?.glb) return { ...base, state: "todo" as const };
+        // Sans modèle Meshy, il n'y a rien à comparer.
+        return { ...base, state: detailsSkipped(a, m, needsParts) ? ("skip" as const) : ("todo" as const), note: "pas de modèle Meshy" };
+      }
+      if (x.status === "error") return { ...base, state: "error" as const, date: x.startedAt, note: x.error };
+      if (x.status === "running" && Date.now() - Date.parse(x.startedAt) > 600_000)
+        return { ...base, state: "error" as const, date: x.startedAt, note: "Contrôle interrompu : relance-le." };
+      if (x.status === "running") return { ...base, state: "current" as const, date: x.startedAt, note: "en cours", busy: true };
+      return { ...base, state: "done" as const, date: x.startedAt, note: `${x.result?.manques.length ?? 0} détail(s)` };
+    }
     const date = def.manual ? s[def.manual] : undefined;
     return { ...base, state: date ? ("done" as const) : ("todo" as const), date };
   });
@@ -65,17 +86,21 @@ export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, 
   return steps;
 }
 
+/** L'étape Pièces est sautée (rien à modéliser) : le contrôle des détails l'est aussi. */
+const detailsSkipped = (a: AnalysisRecord | null, m: Job | null, needsParts?: boolean) => !m && a?.status === "done" && !needsParts;
+
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [analyse, meshy, suivi] = await Promise.all([
+  const [analyse, meshy, details, suivi] = await Promise.all([
     readJson<AnalysisRecord>(`submissions/${id}/analyse.json`),
     readJson<Job>(`submissions/${id}/meshy.json`),
+    readJson<DetailsRecord>(`submissions/${id}/details.json`),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
-  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured());
+  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured(), details);
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
-  return { id, demande: { ...demande, id }, analyse, meshy, suivi, steps, progress };
+  return { id, demande: { ...demande, id }, analyse, meshy, details, suivi, steps, progress };
 }
 
 /** Toutes les demandes, la plus récente d'abord. */

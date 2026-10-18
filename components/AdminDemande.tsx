@@ -6,6 +6,7 @@ import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
 import LiveRefresh from "./LiveRefresh";
 import GlbViewer from "./GlbViewer";
+import { renderViews } from "./renderViews";
 import { MESHY_VIEWS, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 
@@ -16,13 +17,20 @@ const TRAITEMENT: Record<string, string> = {
   a_verifier: "À vérifier",
 };
 
+const SOLUTION: Record<string, string> = {
+  sketchfab: "Pièce Sketchfab",
+  decalque: "Décalque",
+  a_modeliser: "À modéliser",
+  ignorer: "Ignorable",
+};
+
 const day = (iso?: string) =>
   iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
 
 /** Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi. */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, analyse, meshy, suivi, steps } = order;
+  const { id, demande, analyse, meshy, details, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "photos";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -32,7 +40,9 @@ export default function AdminDemande({ order }: { order: Order }) {
   const def = STEPS.find((s) => s.key === sel)!;
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
   const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
-  const running = analyseBusy || meshyRunning;
+  const detailsBusy = Boolean(steps.find((s) => s.key === "details")?.busy);
+  const running = analyseBusy || meshyRunning || detailsBusy;
+  const x = details?.result;
 
   const pieces = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
   const meshyInputs =
@@ -44,6 +54,33 @@ export default function AdminDemande({ order }: { order: Order }) {
   useEffect(() => {
     if (needThumb) fetch(`/api/meshy?id=${id}`).then(() => router.refresh()).catch(() => null);
   }, [needThumb, id, router]);
+
+  // Contrôle des détails : on rend 4 vues du modèle ici (le serveur ne sait pas faire de 3D), puis Claude compare.
+  async function checkDetails() {
+    if (!meshy?.glb) return;
+    setBusy("details");
+    setError("");
+    try {
+      const views = await renderViews(photoSrc(meshy.glb));
+      const res = await fetch("/api/details", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, views }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setError(d.error ?? `Erreur ${res.status}`);
+    } catch (e) {
+      setError(`Rendu des vues impossible : ${(e as Error).message}`);
+    }
+    setBusy("");
+    router.refresh();
+  }
+
+  // Dès que le modèle Meshy est là et qu'aucun contrôle n'a été fait, on le lance une fois tout seul.
+  const autoDetails = Boolean(meshy?.glb && !details);
+  const [autoDone, setAutoDone] = useState(false);
+  useEffect(() => {
+    if (autoDetails && !autoDone) {
+      setAutoDone(true);
+      checkDetails();
+    }
+  });
 
   async function call(label: string, url: string, body: unknown, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -241,6 +278,65 @@ export default function AdminDemande({ order }: { order: Order }) {
                 {meshy ? "Génération lancée" : busy === "meshy" ? "Lancement…" : "Générer en 3D (Meshy)"}
               </button>
             </div>
+          </>
+        )}
+
+        {sel === "details" && (
+          <>
+            {!meshy?.glb && <p className="notice">Il faut d&apos;abord le modèle Meshy (bloc Pièces 3D).</p>}
+            {(detailsBusy || busy === "details") && (
+              <p className="notice">Claude compare le modèle Meshy aux photos, le résultat s&apos;affiche ici tout seul.</p>
+            )}
+            {step.state === "error" && <p className="notice err">Contrôle impossible : {details?.error ?? step.note}</p>}
+            {x && (
+              <>
+                <p className="admin-resume">{x.resume}</p>
+                <div className="admin-diffs">
+                  {x.manques.map((d, i) => (
+                    <div key={i} className={`admin-diff imp-${d.importance}`}>
+                      <div className="admin-diff-head">
+                        <strong>{d.detail}</strong>
+                        <span className="chip on">{SOLUTION[d.solution] ?? d.solution}</span>
+                      </div>
+                      <p>{d.ou}</p>
+                      {d.type === "logo_marque" && (
+                        <p className="notice warn">Logo de marque déposée : on ne le reproduit pas tel quel. À toi de décider (décalque générique, monogramme, ou rien).</p>
+                      )}
+                      <span className="sub">
+                        Importance {d.importance}
+                        {d.recherche && (
+                          <>
+                            {" · "}
+                            <a
+                              className="link"
+                              href={`https://sketchfab.com/search?q=${encodeURIComponent(d.recherche)}&type=models`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              chercher « {d.recherche} » sur Sketchfab
+                            </a>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  {!x.manques.length && <p className="notice">Rien d&apos;important ne manque.</p>}
+                </div>
+                {x.alertes.length > 0 && (
+                  <>
+                    <h4>Problèmes du rendu Meshy</h4>
+                    <ul className="admin-list">{x.alertes.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                  </>
+                )}
+              </>
+            )}
+            {meshy?.glb && (
+              <div className="admin-actions">
+                <button className="cta ghost" disabled={Boolean(busy) || detailsBusy} onClick={checkDetails}>
+                  {busy === "details" ? "Contrôle…" : details ? "Refaire le contrôle" : "Lancer le contrôle"}
+                </button>
+              </div>
+            )}
           </>
         )}
 

@@ -18,6 +18,7 @@ export const STEPS: { key: string; label: string; who: string; tone: Tone; help:
   { key: "analyse", label: "Le point", who: "Claude (auto)", tone: "claude", help: "Claude compare toutes les photos à la voiture de base et liste les différences. 2e e-mail." },
   { key: "valide", label: "Point validé", who: "Toi", tone: "toi", help: "Tu relis le point, tu corriges si besoin, tu valides.", manual: "valide" },
   { key: "pieces", label: "Pièces 3D", who: "Meshy", tone: "meshy", help: "Les pièces différentes sont générées (bibliothèque d'abord, Meshy sinon). Tu lances, c'est plafonné." },
+  { key: "details", label: "Détails manquants", who: "Claude (auto)", tone: "claude", help: "Claude compare le rendu Meshy aux photos et liste les petits détails qui manquent (badges, logos, petites pièces), avec où les trouver." },
   { key: "assemblage", label: "Assemblage & couleurs", who: "Claude + Blender", tone: "blender", help: "Pose des pièces sur la base, couleurs, décalques. Rendus de la miniature.", manual: "assemblage" },
   { key: "rendu", label: "Rendu envoyé", who: "Toi", tone: "toi", help: "Tu envoies les rendus au client pour validation.", manual: "rendu" },
   { key: "accord", label: "Client OK + paiement", who: "Client", tone: "client", help: "Le client valide son rendu et paie.", manual: "accord" },

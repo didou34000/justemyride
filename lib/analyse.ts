@@ -111,7 +111,7 @@ Règles :
 Réponds en français.`;
 
 /** Photo du client → JPEG réduit (les photos de téléphone dépassent la taille acceptée par l'API). */
-async function photoBlock(slot: string, pathname: string): Promise<Anthropic.ContentBlockParam[]> {
+export async function photoBlock(slot: string, pathname: string): Promise<Anthropic.ContentBlockParam[]> {
   const { data } = await readBytes(pathname);
   const jpeg = await sharp(data).rotate().resize(1568, 1568, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
   return [
