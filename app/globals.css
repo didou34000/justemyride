@@ -622,3 +622,6 @@ a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); 
   .finish-grid li:first-child { grid-column: 1 / -1; }
   .home-block { padding-top: 56px; }
 }
+
+/* Page 404 */
+.notfound { min-height: 60vh; }

@@ -1,6 +1,8 @@
 # JustMyRide
 
-Site de miniatures de voitures personnalisées. V1 : une page simple où le client renseigne sa voiture, ajoute ses photos, choisit ses options et commande.
+Miniatures de voitures personnalisées, en pièce unique. Le client choisit sa voiture (ou envoie 8 photos), la personnalise en 3D, commande et paie sur Shopify ; on la fabrique et on la livre.
+
+En ligne : https://justemyride.vercel.app (Next.js 15, hébergé sur Vercel, déployé à chaque push sur `main`).
 
 ## Lancer en local
 
@@ -10,40 +12,30 @@ npm run dev
 # http://localhost:3000
 ```
 
-## Ce que fait le site
+## Pages
 
-- **Accueil (`/`)** : parcours photo guidé, une étape par angle. 8 photos en faisant le tour de la voiture (4 faces + 4 trois-quarts) : pour chaque angle, une voiture modèle montre le cadrage attendu, avec un plan vu de dessus indiquant où se placer. Après chaque photo, le parcours passe tout seul à l'angle suivant. Puis jusqu'à 4 photos de détail (facultatif), puis voiture + email. Les 4 faces sont l'entrée idéale des IA multi-vues (Tripo, Meshy), les 3/4 servent au choix des meilleures vues et à la retouche Blender.
-- Les photos d'exemple (`public/guide/*.jpg`, une par angle) sont générées par IA : même voiture grise, même parking.
-- Les fichiers partent directement du navigateur vers **Vercel Blob** (jusqu'à 500 Mo par fichier), dans `submissions/<date>-<id>/`, avec un `demande.json` (email, voiture, liste des fichiers).
-- Sans stockage branché, l'envoi est simulé (« mode démo »).
+- **Accueil (`/`)** : la photo d'une vraie voiture se fond dans sa miniature 3D au défilement, puis garanties, étapes, tailles, finitions, envoi des photos et FAQ.
+- **Envoi des photos** (sur l'accueil) : choix de la voiture de base, puis 8 angles guidés (photos d'exemple dans `public/guide/*.jpg`), détails facultatifs, e-mail et consentement. Les fichiers partent directement du navigateur vers Vercel Blob, dans `submissions/<date>-<id>/`, avec un `demande.json`.
+- **Garage (`/configurer`)** : voitures du catalogue (`lib/cars.ts`) et recherche de modèles Sketchfab.
+- **Configurateur (`/configurer/[slug]`, `/configurer/sketchfab/[uid]`)** : teinte, finition, jantes, échappement, étriers, taille, socle et vitrine, avec la miniature 3D sur son socle. « Commander » crée un panier Shopify.
+- **Pages légales** : `/cgv`, `/confidentialite`, `/mentions-legales` (infos vendeur dans `lib/legal.ts`).
+- **Admin (`/admin`, protégé par mot de passe)** : suivi des demandes, analyse des photos par Claude, génération 3D Meshy.
 
-## Brancher le stockage des photos (Vercel Blob)
+## Services branchés
 
-1. Dans Vercel : projet → **Storage** → **Create** → **Blob**, en accès **Private** (les photos montrent des plaques), puis le connecter au projet.
-2. Vercel ajoute tout seul la variable `BLOB_READ_WRITE_TOKEN`. Redéployer.
-3. Les demandes reçues se consultent dans Storage → le store Blob → dossier `submissions/`.
-4. Si tu crées un store **Public** à la place, ajoute `NEXT_PUBLIC_BLOB_ACCESS=public`.
+| Service | Rôle | Variables |
+|---|---|---|
+| Vercel Blob (privé, Paris) | photos des clients | `BLOB_STORE_ID` (connexion OIDC, ajoutée par Vercel) ou `BLOB_READ_WRITE_TOKEN` |
+| Shopify (headless) | produits, paiement, commandes | `SHOPIFY_STOREFRONT_TOKEN` (boutique et IDs de variantes dans `lib/shopify.ts`) |
+| Resend | e-mail d'alerte à chaque envoi de photos | `RESEND_API_KEY`, `NOTIFY_EMAIL`, `RESEND_FROM` (facultatif) |
+| Sketchfab | recherche et téléchargement de modèles 3D | `SKETCHFAB_API_TOKEN` |
+| Anthropic (Claude) | analyse automatique des photos | `ANTHROPIC_API_KEY`, plafonds `ANALYSE_*_LIMIT` |
+| Meshy | génération 3D depuis les photos, lancée depuis l'admin | `MESHY_API_KEY`, plafonds `MESHY_*_LIMIT` |
+| Admin | accès au tableau de bord | `ADMIN_PASSWORD`, `ADMIN_TOKEN` |
 
-## Configurateur (`/configurer`)
+Voir `.env.example` pour la liste complète. Sans une variable, la fonction concernée se désactive (mode démo pour le stockage et le paiement).
 
-- Page d'accueil + configurateur : voiture (marque, modèle, année), peinture (8 teintes + couleur libre, finition brillant / métallisé / mat), jantes (style + couleur), aileron, plaque, taille (1:43, 1:24, 1:18), finitions (socle, vitrine).
-- Aperçu 2D en direct (SVG) qui suit les choix. Il sera remplacé par le viewer 3D.
-- Prix calculé en direct (`lib/options.ts`). **Les prix sont provisoires.**
-- Bouton « Commander » : crée un panier Shopify via la Storefront API si les variables d'environnement sont renseignées, sinon affiche un message « mode démo ».
+## À faire
 
-## Pas encore fait
-
-- Les photos restent dans le navigateur : rien n'est envoyé ni stocké côté serveur.
-- Pas de viewer 3D ni de génération IA.
-- Shopify n'est pas branché (aucune clé).
-
-## Brancher Shopify
-
-1. Fait : boutique `jsgvit-dt.myshopify.com`, produits « Miniature personnalisée » (1:43, 1:24, 1:18), « Socle noir gravé » et « Vitrine acrylique ». Leurs IDs sont dans `lib/shopify.ts`.
-2. À faire : créer une app Shopify avec accès Storefront API, puis mettre son jeton dans `SHOPIFY_STOREFRONT_TOKEN` (Vercel, ou `.env.local` en local). Sans jeton, le bouton « Commander » reste en mode démo.
-3. Les produits doivent être actifs et publiés sur le canal de vente de l'app pour être achetables.
-4. La configuration du client (couleur, jantes, étriers…) est transmise comme attributs de la ligne de panier et apparaît dans la commande Shopify.
-
-## Déployer sur Vercel
-
-Importer le dépôt dans Vercel (framework détecté automatiquement), puis ajouter les mêmes variables d'environnement.
+- Désigner un médiateur de la consommation et le renseigner dans `lib/legal.ts` (`mediator`).
+- Domaine `justmyride.shop` : une fois acheté, mettre à jour `SELLER.site` (`lib/legal.ts`), la redirection du thème Shopify et l'expéditeur Resend.
