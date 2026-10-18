@@ -3,6 +3,7 @@ import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
 import CarSearch from "@/components/CarSearch";
 import { LogoMark } from "@/components/Logo";
+import { brandLogo } from "@/lib/catalog";
 import Footer from "@/components/Footer";
 
 export const metadata = { title: "Choisis ta voiture — JustMyRide" };
@@ -13,7 +14,9 @@ export default function GaragePage() {
       <Nav link={{ href: "/#deposer", label: "Envoyer ma voiture" }} />
       <section className="garage">
         <p className="eyebrow">Étape 1 · La base</p>
-        <h2>Choisis ta voiture</h2>
+        <h2>
+          Choisis <i>ta</i> voiture
+        </h2>
         <p className="lead">
           Tu choisis ici seulement le modèle de base. Jantes, échappement et couleur se règlent à l'étape suivante, sur
           ta miniature en 3D.
@@ -36,7 +39,7 @@ export default function GaragePage() {
             ) : (
               <Link key={car.slug} href="/#deposer" className="car-card soon">
                 <div className="noimg soon-mark">
-                  <LogoMark size={56} />
+                  {brandLogo(car.make) ? <img src={brandLogo(car.make)} alt="" /> : <LogoMark size={56} />}
                 </div>
                 <div className="car-card-body">
                   <strong>

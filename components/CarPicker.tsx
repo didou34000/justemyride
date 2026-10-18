@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CarSearch from "./CarSearch";
 import ShelfPreview from "./ShelfPreview";
-import { brands, type Base, type Brand, type CarModel, type Generation } from "@/lib/catalog";
+import { brandLogo, brands, type Base, type Brand, type CarModel, type Generation } from "@/lib/catalog";
 import { cars } from "@/lib/cars";
 import type { SketchfabHit } from "@/lib/sketchfab";
 
@@ -22,6 +22,16 @@ function SketchfabEmbed({ uid, title }: { uid: string; title: string }) {
       src={`https://sketchfab.com/models/${uid}/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_vr=0&ui_ar=0&ui_inspector=0&ui_annotations=0&preload=1`}
       allow="autoplay; fullscreen; xr-spatial-tracking"
     />
+  );
+}
+
+/** Logo de la marque, ou ses initiales si on n'a pas le logo. */
+export function BrandMark({ id, mark }: { id: string; mark: string }) {
+  const logo = brandLogo(id);
+  return (
+    <span className="pk-mark" aria-hidden>
+      {logo ? <img src={logo} alt="" /> : mark}
+    </span>
   );
 }
 
@@ -49,6 +59,16 @@ export default function CarPicker({ onPick }: { onPick: (b: Base) => void }) {
     setHit(null);
     setView(b.models.length ? "model" : "search");
   }
+
+  // Une marque cliquée ailleurs sur la page (grille de l'accueil) ouvre directement ses modèles.
+  useEffect(() => {
+    const onBrand = (e: Event) => {
+      const b = brands.find((x) => x.id === (e as CustomEvent<string>).detail);
+      if (b) pickBrand(b);
+    };
+    window.addEventListener("jmr:brand", onBrand);
+    return () => window.removeEventListener("jmr:brand", onBrand);
+  }, []);
 
   function pickModel(m: CarModel) {
     setModel(m);
@@ -95,9 +115,7 @@ export default function CarPicker({ onPick }: { onPick: (b: Base) => void }) {
           <div className="pk-brands">
             {brands.map((b) => (
               <button key={b.id} className="pk-brand" onClick={() => pickBrand(b)}>
-                <span className="pk-mark" aria-hidden>
-                  {b.mark}
-                </span>
+                <BrandMark id={b.id} mark={b.mark} />
                 <span>{b.name}</span>
               </button>
             ))}
