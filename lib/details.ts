@@ -52,6 +52,7 @@ Ta tâche : lister les petits détails visibles sur les photos qui manquent ou s
 
 Règles :
 - Sans abuser : 8 éléments au maximum, seulement ce qui se verra sur une miniature. Le plus visible d'abord.
+- Le chromé n'est pas un détail : tout ce qui est chromé sera peint en gris clair mat. Ne le liste pas.
 - Les grosses différences de forme ont déjà été traitées : ne les répète que si le rendu est vraiment faux (dans alertes).
 - Logos et noms de marque (ex. ailes MINI, « Cooper S ») : type logo_marque. On ne les reproduit pas tels quels (marques déposées) : propose decalque en le signalant, l'humain décidera.
 - Pour chaque pièce qu'on pourrait trouver toute faite, donne des mots-clés anglais pour Sketchfab.
