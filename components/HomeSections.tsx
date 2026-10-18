@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "./Logo";
 import { accessories, sizes } from "@/lib/options";
 import { LEAD_TIME, SELLER } from "@/lib/legal";
 
@@ -101,7 +102,7 @@ export function Sizes() {
           <li key={s.id} className={s.id === "1-24" ? "pop" : ""}>
             {s.id === "1-24" && <em>Notre conseil</em>}
             <div className="size-visual" aria-hidden>
-              <i style={{ width: `${40 + i * 25}%` }} />
+              <LogoMark size={[30, 46, 62][i]} />
             </div>
             <strong>{s.label}</strong>
             <span>{s.length} de long</span>
