@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
 import LiveRefresh from "./LiveRefresh";
-import { STEPS } from "@/lib/steps";
+import GlbViewer from "./GlbViewer";
+import { MESHY_VIEWS, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 
 const TRAITEMENT: Record<string, string> = {
@@ -32,6 +33,17 @@ export default function AdminDemande({ order }: { order: Order }) {
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
   const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
   const running = analyseBusy || meshyRunning;
+
+  const pieces = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
+  const meshyInputs =
+    meshy?.inputs ??
+    (MESHY_VIEWS.map((v) => demande.files.find((f) => f.slot === v)?.pathname).filter(Boolean) as string[]);
+
+  // Générations finies avant qu'on garde l'aperçu : on va le chercher une fois chez Meshy.
+  const needThumb = Boolean(meshy?.glb && !meshy.thumb && meshy.taskId);
+  useEffect(() => {
+    if (needThumb) fetch(`/api/meshy?id=${id}`).then(() => router.refresh()).catch(() => null);
+  }, [needThumb, id, router]);
 
   async function call(label: string, url: string, body: unknown, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -158,28 +170,68 @@ export default function AdminDemande({ order }: { order: Order }) {
 
         {sel === "pieces" && (
           <>
-            {r && (
-              <ul className="admin-list">
-                {r.differences.filter((d) => d.traitement === "piece_3d").map((d, i) => (
-                  <li key={i}>
-                    <b>{d.piece}</b> : {d.description}
-                  </li>
-                ))}
-              </ul>
+            {pieces.length > 0 && (
+              <>
+                <h4>Pièces différentes repérées par Claude</h4>
+                <ul className="admin-list">
+                  {pieces.map((d, i) => (
+                    <li key={i}>
+                      <b>{d.piece}</b> : {d.description}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
-            {meshy && (
-              <p className={`notice ${step.state === "error" ? "err" : ""}`}>
-                Meshy : {meshy.status}
-                {meshy.progress ? ` · ${meshy.progress} %` : ""}
-                {meshy.error ? ` · ${meshy.error}` : ""}
-                {meshy.glb && (
+
+            <div className="meshy-io">
+              <div className="meshy-col">
+                <h4>{meshy ? "Envoyé à Meshy" : "Sera envoyé à Meshy"}</h4>
+                <div className="meshy-in">
+                  {meshyInputs.map((p) => (
+                    <a key={p} href={photoSrc(p)} target="_blank" rel="noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photoSrc(p)} alt="" loading="lazy" />
+                      <span>{demande.files.find((f) => f.pathname === p)?.slot}</span>
+                    </a>
+                  ))}
+                </div>
+                <p className="sub">
+                  Multi-vues, {meshyInputs.length} photo{meshyInputs.length > 1 ? "s" : ""} de la voiture entière, texture{" "}
+                  {meshy?.texture ? "oui" : "non (on repeint nous-mêmes)"}.
+                </p>
+                <p className="notice">
+                  Pour l&apos;instant, Meshy reçoit la voiture entière. L&apos;envoi pièce par pièce (une planche avec l&apos;aileron, les jantes…) n&apos;est
+                  pas encore fait.
+                </p>
+              </div>
+              <span className="meshy-arrow" aria-hidden>→</span>
+              <div className="meshy-col">
+                <h4>Rendu Meshy</h4>
+                {meshy?.glb ? (
                   <>
-                    {" · "}
-                    <a className="link" href={meshy.glb} target="_blank" rel="noreferrer">télécharger le modèle</a>
+                    <GlbViewer src={photoSrc(meshy.glb)} />
+                    <p className="sub">
+                      Tourne autour à la souris.{" "}
+                      <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>Télécharger le .glb</a>
+                    </p>
                   </>
+                ) : meshy?.thumb ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img className="meshy-thumb" src={photoSrc(meshy.thumb)} alt="Aperçu Meshy" />
+                ) : (
+                  <div className="glb-viewer">
+                    <span>
+                      {!meshy
+                        ? "Pas encore lancé."
+                        : step.state === "error"
+                          ? `Échec : ${meshy.error ?? meshy.status}`
+                          : `Meshy travaille… ${meshy.progress ?? 0} %`}
+                    </span>
+                  </div>
                 )}
-              </p>
-            )}
+              </div>
+            </div>
+
             <div className="admin-actions">
               <button
                 className="cta ghost"
@@ -190,6 +242,30 @@ export default function AdminDemande({ order }: { order: Order }) {
               </button>
             </div>
           </>
+        )}
+
+        {sel === "assemblage" && (
+          <div className="notice">
+            <b>Rien ne se fait tout seul ici pour l&apos;instant.</b> Le site tourne sur Vercel, qui ne peut pas faire tourner Blender. L&apos;assemblage
+            (pose des pièces sur la base, couleurs, décalques) se fait à la main : Claude le fait dans Blender, dans le chat du projet.{" "}
+            {meshy?.glb ? (
+              <>
+                Télécharge{" "}
+                <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>le modèle Meshy</a>
+                {demande.base?.uid && (
+                  <>
+                    {" "}et{" "}
+                    <a className="link" href={`https://sketchfab.com/3d-models/${demande.base.uid}`} target="_blank" rel="noreferrer">
+                      le modèle de base
+                    </a>
+                  </>
+                )}
+                , envoie-{demande.base?.uid ? "les" : "le"} dans le chat, puis coche « C&apos;est fait » quand le rendu est prêt.
+              </>
+            ) : (
+              "Il faut d'abord le modèle Meshy (bloc Pièces 3D)."
+            )}
+          </div>
         )}
 
         {def.manual && (

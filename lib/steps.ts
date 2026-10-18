@@ -25,3 +25,5 @@ export const STEPS: { key: string; label: string; who: string; tone: Tone; help:
   { key: "expedie", label: "Expédiée", who: "Toi", tone: "toi", help: "Colis parti chez le client.", manual: "expedie" },
 ];
 
+/** Les photos envoyées à Meshy pour le multi-vues (4 au maximum), dans cet ordre. */
+export const MESHY_VIEWS = ["avant", "gauche", "arriere", "droite"];

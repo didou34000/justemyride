@@ -2,6 +2,7 @@ import { get, put } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
 export { isAdmin } from "@/lib/adminAuth";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
+import { MESHY_VIEWS } from "@/lib/steps";
 
 /**
  * Génération 3D Meshy (multi-photos → GLB), côté serveur uniquement.
@@ -16,7 +17,7 @@ import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 
 const API = "https://api.meshy.ai/openapi/v1/multi-image-to-3d";
 // Les 4 faces nourrissent le multi-vues (Meshy en accepte 4 au maximum).
-const VIEWS = ["avant", "gauche", "arriere", "droite"];
+const VIEWS = MESHY_VIEWS;
 
 const num = (v: string | undefined, d: number) => (v && /^\d+$/.test(v) ? Number(v) : d);
 export const DAILY_LIMIT = num(process.env.MESHY_DAILY_LIMIT, 2);
@@ -41,6 +42,11 @@ export type Job = {
   taskId?: string;
   progress?: number;
   glb?: string;
+  /** Aperçu image du résultat, copié depuis Meshy. */
+  thumb?: string;
+  /** Ce qu'on a envoyé : les photos et les réglages. */
+  inputs?: string[];
+  texture?: boolean;
   error?: string;
   startedAt: string;
 };
@@ -83,7 +89,8 @@ export async function startJob(id: string): Promise<Job> {
   if (photos.length < 2) throw new Error("Il faut au moins 2 des 4 faces (avant, gauche, arrière, droite)");
 
   // Réservation avant l'appel : un double clic ne lance pas deux générations payantes.
-  const job: Job = { status: "starting", startedAt: now.toISOString() };
+  const texture = process.env.MESHY_TEXTURE === "1";
+  const job: Job = { status: "starting", startedAt: now.toISOString(), inputs: photos, texture };
   await writeJson(jobPath(id), job);
 
   try {
@@ -92,7 +99,7 @@ export async function startJob(id: string): Promise<Job> {
       body: JSON.stringify({
         image_urls: await Promise.all(photos.map(asDataUri)),
         // La texture coûte des crédits en plus et on repeint la voiture nous-mêmes.
-        should_texture: process.env.MESHY_TEXTURE === "1",
+        should_texture: texture,
       }),
     });
     job.status = "PENDING";
@@ -115,9 +122,27 @@ export async function startJob(id: string): Promise<Job> {
 /** Met à jour l'état ; une fois prêt, copie le GLB dans le stockage (les liens Meshy expirent). */
 export async function refreshJob(id: string): Promise<Job | null> {
   const job = await readJob(id);
-  if (!job?.taskId || job.glb || ["FAILED", "CANCELED", "error"].includes(job.status)) return job;
+  if (!job?.taskId || ["FAILED", "CANCELED", "error"].includes(job.status)) return job;
+  if (job.glb && job.thumb) return job;
 
   const t = await meshy(`/${job.taskId}`);
+  // Aperçu image (aussi rattrapé pour les générations finies avant que l'on garde l'aperçu).
+  if (!job.thumb && t.thumbnail_url) {
+    const img = await fetch(t.thumbnail_url).catch(() => null);
+    if (img?.ok) {
+      const saved = await put(`submissions/${id}/meshy.png`, Buffer.from(await img.arrayBuffer()), {
+        access: BLOB_ACCESS,
+        contentType: img.headers.get("content-type") || "image/png",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+      });
+      job.thumb = saved.pathname;
+    }
+  }
+  if (job.glb) {
+    await writeJson(jobPath(id), job);
+    return job;
+  }
   job.status = t.status;
   job.progress = t.progress;
   if (t.status === "FAILED") job.error = t.task_error?.message || "Échec Meshy";

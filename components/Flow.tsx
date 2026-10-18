@@ -86,7 +86,16 @@ function Preview({ step, order }: { step: Step; order: Order }) {
       return <span className="node-note">Part tout seul après l&apos;envoi des photos.</span>;
     case "pieces": {
       const todo = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
-      if (meshy?.glb || meshy?.status === "SUCCEEDED") return <span className="node-ok">Modèle 3D reçu</span>;
+      if (meshy?.glb || meshy?.status === "SUCCEEDED")
+        return (
+          <>
+            {meshy.thumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="node-thumb" src={photoSrc(meshy.thumb)} alt="Rendu Meshy" loading="lazy" />
+            )}
+            <span className="node-ok">Modèle 3D reçu</span>
+          </>
+        );
       if (meshy && step.state === "error") return <span className="node-err">{meshy.error ?? meshy.status}</span>;
       if (meshy)
         return (
