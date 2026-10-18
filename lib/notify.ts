@@ -11,6 +11,7 @@ export type NewRequest = {
   id: string;
   email: string;
   car: string;
+  base?: { label: string; uid?: string; car?: string; source: string } | null;
   files: { slot: string; pathname: string }[];
 };
 
@@ -29,11 +30,20 @@ export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
   const car = r.car.trim() || "Voiture non précisée";
   const angles = r.files.filter((f) => !f.slot.startsWith("detail-")).length;
   const details = r.files.length - angles;
+  const uid = r.base?.uid && /^[\w-]{10,40}$/.test(r.base.uid) ? r.base.uid : "";
+  const base = !r.base
+    ? "non choisie"
+    : uid
+      ? `<a href="https://sketchfab.com/3d-models/${uid}">${esc(r.base.label)}</a> (${r.base.source === "recherche" ? "recherche libre" : "annuaire"})`
+      : r.base.car
+        ? `${esc(r.base.label)} (garage : ${esc(r.base.car)})`
+        : `${esc(r.base.label)} (aucun modèle 3D, à partir des photos)`;
   const html = `
     <div style="font-family:Inter,Arial,sans-serif;color:#161514;line-height:1.5">
       <h2 style="margin:0 0 12px">Nouvelle demande : ${esc(car)}</h2>
       <p style="margin:0 0 16px">
         Client : <a href="mailto:${esc(r.email)}">${esc(r.email)}</a><br>
+        Base 3D : ${base}<br>
         Photos : ${angles} angles${details ? ` + ${details} détail${details > 1 ? "s" : ""}` : ""}<br>
         Dossier : <code>submissions/${esc(r.id)}/</code>
       </p>
