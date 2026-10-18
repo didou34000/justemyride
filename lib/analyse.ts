@@ -16,7 +16,9 @@ import type { Base } from "@/lib/catalog";
  * plafonds ANALYSE_DAILY_LIMIT / ANALYSE_MONTHLY_LIMIT (quelques centimes chacune).
  */
 
-const MODEL = "claude-opus-5-5";
+// Sonnet : bon en vision et 2 fois moins cher qu'Opus. ANALYSE_MODEL permet d'en changer sans toucher au code
+// (ex. claude-haiku-5-5, beaucoup moins cher mais moins fin sur les détails).
+const MODEL = process.env.ANALYSE_MODEL || "claude-sonnet-5-5";
 const usage = usageCounter(
   "analyse",
   num(process.env.ANALYSE_DAILY_LIMIT, 20),
@@ -179,7 +181,7 @@ export async function analyse(id: string, { force = false } = {}): Promise<Analy
       model: MODEL,
       max_tokens: 16000,
       system: SYSTEM,
-      output_config: { effort: "high", format: zodOutputFormat(Analysis) },
+      output_config: { effort: "medium", format: zodOutputFormat(Analysis) },
       messages: [
         {
           role: "user",
