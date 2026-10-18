@@ -392,3 +392,68 @@ a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); 
 .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); margin: 4px 0 14px; cursor: pointer; }
 .consent input { accent-color: var(--text); width: 16px; height: 16px; margin-top: 2px; flex: none; }
 .order-note { font-size: 12px; color: var(--muted); padding: 0 clamp(16px, 3vw, 32px) 12px; line-height: 1.5; }
+
+/* Tableau de bord admin */
+.admin.wide { max-width: 1100px; }
+.admin-login { max-width: 420px; }
+.admin-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 24px 0 8px; }
+.admin-stats div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.admin-stats b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.admin-stats span { font-size: 12px; color: var(--muted); }
+.admin h3 { margin-top: 32px; }
+.admin-back { max-width: 760px; margin: -64px auto 80px; padding: 0 16px; }
+
+/* Le parcours expliqué */
+.parcours { list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; padding: 4px 0 12px; }
+.parcours li { position: relative; padding: 0 12px 0 0; }
+.parcours li::before { content: ""; position: absolute; top: 15px; left: 32px; right: 0; height: 2px; background: var(--line); }
+.parcours li:last-child::before { display: none; }
+.parcours-n { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--text); color: var(--bg); font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+.parcours strong { display: block; font-size: 14px; font-weight: 600; }
+.parcours em { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.parcours p { font-size: 12px; color: var(--muted); line-height: 1.45; }
+/* Sur petit écran, le parcours se lit de haut en bas. */
+@media (max-width: 900px) {
+  .parcours { grid-auto-flow: row; gap: 18px; }
+  .parcours li { padding: 0 0 0 46px; min-height: 32px; }
+  .parcours li::before { top: 32px; bottom: -18px; left: 15px; right: auto; width: 2px; height: auto; }
+  .parcours-n { position: absolute; left: 0; top: 0; }
+}
+
+/* Frise d'une commande */
+.frise { list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(110px, 1fr); overflow-x: auto; padding: 6px 0 10px; }
+.frise.compact { grid-auto-columns: 1fr; padding: 10px 0 6px; overflow: visible; }
+.frise-step { position: relative; padding-right: 8px; }
+.frise-step::before { content: ""; position: absolute; top: 12px; left: 26px; right: 0; height: 2px; background: var(--line); }
+.frise.compact .frise-step::before { top: 8px; left: 18px; }
+.frise-step:last-child::before { display: none; }
+.frise-step.done::before, .frise-step.skip::before { background: var(--text); }
+.frise-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); font-size: 12px; font-weight: 700; color: var(--bg); }
+.frise.compact .frise-dot { width: 18px; height: 18px; font-size: 10px; }
+.frise-step.done .frise-dot { background: var(--text); border-color: var(--text); }
+.frise-step.skip .frise-dot { background: var(--bg-2); border-color: var(--line-strong); color: var(--muted); }
+.frise-step.current .frise-dot { border-color: #ff4d1a; color: #ff4d1a; box-shadow: 0 0 0 4px #ff4d1a22; }
+.frise-step.error .frise-dot { background: #b4483c; border-color: #b4483c; }
+.frise-text { display: flex; flex-direction: column; margin-top: 8px; }
+.frise-text strong { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.frise-text em { font-style: normal; font-size: 11px; color: var(--muted); }
+.frise-text small { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.frise-step.current .frise-text strong { color: #c23a12; }
+.frise-step.todo .frise-text strong { color: var(--muted); font-weight: 500; }
+.frise-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* Liste des demandes */
+.orders { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.order { display: flex; flex-direction: column; gap: 2px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; color: var(--text); text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+.order:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
+.order-head { display: flex; justify-content: space-between; gap: 10px; }
+.order-head strong { font-weight: 600; }
+.order-head span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.order-next { font-size: 13px; }
+.order-next.current { color: #c23a12; }
+.order-next.error { color: #b4483c; font-weight: 600; }
+.order-next.done { color: var(--ok); }
+.admin-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.admin-photos a { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-decoration: none; }
+.admin-photos img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 10px; background: var(--bg-2); }

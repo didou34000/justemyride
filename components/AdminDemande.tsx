@@ -1,14 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { AnalysisRecord } from "@/lib/analyse";
-import type { Base } from "@/lib/catalog";
-
-type Data = {
-  demande: { email: string; car: string; base?: Base | null; receivedAt?: string; files: { slot: string }[] };
-  analyse: AnalysisRecord | null;
-  usage: { today: number; month: number; dailyLimit: number; monthlyLimit: number };
-};
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Timeline from "./Timeline";
+import { STEPS } from "@/lib/steps";
+import type { Order } from "@/lib/orders";
 
 const TRAITEMENT: Record<string, string> = {
   couleur: "Peinture",
@@ -17,82 +13,31 @@ const TRAITEMENT: Record<string, string> = {
   a_verifier: "À vérifier",
 };
 
-/** Page du propriétaire : la demande d'un client et le point de l'analyse automatique. Protégée par ADMIN_TOKEN. */
-export default function AdminDemande({ id }: { id: string }) {
-  const [token, setToken] = useState("");
-  const [data, setData] = useState<Data | null>(null);
+/** Page du propriétaire pour une demande : frise, photos, le point de l'analyse, actions. */
+export default function AdminDemande({ order }: { order: Order }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { id, demande, analyse, meshy, suivi, steps } = order;
+  const r = analyse?.result;
 
-  useEffect(() => {
-    try {
-      setToken(localStorage.getItem("jmr-admin") ?? "");
-    } catch {}
-  }, []);
-
-  const load = useCallback(async () => {
-    if (!token) return;
+  async function call(label: string, url: string, body: unknown, confirmText?: string) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBusy(label);
     setError("");
-    const res = await fetch(`/api/analyse?id=${encodeURIComponent(id)}`, { headers: { "x-admin-token": token } });
-    const d = await res.json();
-    if (!res.ok) return setError(d.error ?? `Erreur ${res.status}`);
-    try {
-      localStorage.setItem("jmr-admin", token);
-    } catch {}
-    setData(d);
-  }, [id, token]);
-
-  useEffect(() => {
-    if (token) load();
-  }, [token, load]);
-
-  // Tant que l'analyse tourne, on recharge de temps en temps.
-  useEffect(() => {
-    if (data?.analyse?.status !== "running") return;
-    const t = setTimeout(load, 8000);
-    return () => clearTimeout(t);
-  }, [data, load]);
-
-  async function rerun(force: boolean) {
-    setBusy(true);
-    setError("");
-    const res = await fetch("/api/analyse", {
-      method: "POST",
-      headers: { "x-admin-token": token, "Content-Type": "application/json" },
-      body: JSON.stringify({ id, force }),
-    });
-    const d = await res.json();
-    setBusy(false);
-    if (!res.ok) return setError(d.error ?? `Erreur ${res.status}`);
-    load();
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    setBusy("");
+    if (!res.ok) setError(d.error ?? `Erreur ${res.status}`);
+    router.refresh();
   }
 
-  if (!data)
-    return (
-      <section className="admin">
-        <h2>Demande {id}</h2>
-        <form
-          className="up-fields"
-          onSubmit={(e) => {
-            e.preventDefault();
-            load();
-          }}
-        >
-          <input type="password" placeholder="Code admin" value={token} onChange={(e) => setToken(e.target.value)} />
-          <button className="cta">Ouvrir</button>
-        </form>
-        {error && <p className="notice err">{error}</p>}
-      </section>
-    );
-
-  const { demande, analyse, usage } = data;
-  const r = analyse?.result;
   return (
     <section className="admin">
       <p className="eyebrow">Demande {id}</p>
       <h2>{demande.car || demande.base?.label || "Voiture"}</h2>
       <p className="sub">
-        {demande.email} · {demande.files.length} photos
+        <a className="link" href={`mailto:${demande.email}`}>{demande.email}</a>
         {demande.base?.uid && (
           <>
             {" · "}
@@ -103,10 +48,40 @@ export default function AdminDemande({ id }: { id: string }) {
         )}
       </p>
 
-      {!analyse && <p className="notice">Pas encore analysée.</p>}
-      {analyse?.status === "running" && <p className="notice">Analyse en cours…</p>}
-      {analyse?.status === "error" && <p className="notice err">Analyse impossible : {analyse.error}</p>}
+      <h3>Chronologie</h3>
+      <Timeline steps={steps} />
+      <div className="frise-actions">
+        {STEPS.filter((s) => s.manual).map((s) => {
+          const done = Boolean(suivi[s.manual!]);
+          return (
+            <button
+              key={s.key}
+              className={`chip ${done ? "on" : ""}`}
+              disabled={Boolean(busy)}
+              onClick={() => call(s.key, "/api/admin/suivi", { id, step: s.manual, done: !done })}
+            >
+              {done ? "✓ " : ""}
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
 
+      <h3>Photos</h3>
+      <div className="admin-photos">
+        {demande.files.map((f) => (
+          <a key={f.pathname} href={`/api/admin/photo?p=${encodeURIComponent(f.pathname)}`} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/admin/photo?p=${encodeURIComponent(f.pathname)}`} alt={f.slot} loading="lazy" />
+            <span>{f.slot}</span>
+          </a>
+        ))}
+      </div>
+
+      <h3>Le point</h3>
+      {!analyse && <p className="notice">Pas encore analysée.</p>}
+      {analyse?.status === "running" && <p className="notice">Analyse en cours… recharge la page dans un moment.</p>}
+      {analyse?.status === "error" && <p className="notice err">Analyse impossible : {analyse.error}</p>}
       {r && (
         <>
           <p className="admin-resume">{r.resume}</p>
@@ -125,9 +100,7 @@ export default function AdminDemande({ id }: { id: string }) {
                   <span className="chip on">{TRAITEMENT[d.traitement] ?? d.traitement}</span>
                 </div>
                 <p>{d.description}</p>
-                <span className="sub">
-                  Confiance {d.confiance} · photos : {d.photos.join(", ") || "?"}
-                </span>
+                <span className="sub">Confiance {d.confiance} · photos : {d.photos.join(", ") || "?"}</span>
               </div>
             ))}
             {!r.differences.length && <p className="notice">Aucune différence : la base d&apos;origine suffit.</p>}
@@ -147,13 +120,29 @@ export default function AdminDemande({ id }: { id: string }) {
         </>
       )}
 
+      <h3>Actions</h3>
       <div className="admin-actions">
-        <button className="cta ghost" disabled={busy || analyse?.status === "running"} onClick={() => rerun(Boolean(analyse))}>
-          {busy ? "Analyse…" : analyse ? "Refaire l'analyse" : "Lancer l'analyse"}
+        <button
+          className="cta ghost"
+          disabled={Boolean(busy) || analyse?.status === "running"}
+          onClick={() => call("analyse", "/api/analyse", { id, force: Boolean(analyse) })}
+        >
+          {busy === "analyse" ? "Analyse…" : analyse ? "Refaire l'analyse" : "Lancer l'analyse"}
         </button>
-        <span className="sub">
-          Analyses : {usage.today}/{usage.dailyLimit} aujourd&apos;hui, {usage.month}/{usage.monthlyLimit} ce mois-ci
-        </span>
+        <button
+          className="cta ghost"
+          disabled={Boolean(busy) || Boolean(meshy)}
+          onClick={() =>
+            call("meshy", "/api/meshy", { id }, "Lancer une génération Meshy payante à partir des 4 faces de la voiture ?")
+          }
+        >
+          {meshy ? `Meshy : ${meshy.status}${meshy.progress ? ` ${meshy.progress} %` : ""}` : busy === "meshy" ? "Lancement…" : "Générer en 3D (Meshy)"}
+        </button>
+        {meshy && !meshy.glb && meshy.taskId && (
+          <button className="link" disabled={Boolean(busy)} onClick={async () => { await fetch(`/api/meshy?id=${id}`); router.refresh(); }}>
+            Actualiser Meshy
+          </button>
+        )}
       </div>
       {error && <p className="notice err">{error}</p>}
     </section>
