@@ -72,11 +72,11 @@ h1 span { color: var(--muted); font-weight: 400; }
 .reveal-mini, .reveal-photo { position: absolute; inset: 12px clamp(12px, 2vw, 20px) 20px; border-radius: 24px; overflow: hidden; }
 .reveal-mini { background: var(--wall); }
 .reveal-mini .viewer { position: absolute; inset: 0 0 24% 0; min-height: 0; pointer-events: none; transform: scale(calc(0.9 + var(--p) * 0.1)); }
-.reveal.live .reveal-mini .viewer { pointer-events: auto; }
+.reveal.reveal-live .reveal-mini .viewer { pointer-events: auto; }
 /* Sur mobile, glisser à l'horizontale fait tourner la voiture, à la verticale fait défiler la page. */
 .reveal-mini .viewer canvas { touch-action: pan-y !important; }
 .reveal-mini .viewer-hint { bottom: 4px; transition: opacity .3s; }
-.reveal:not(.live) .reveal-mini .viewer-hint { opacity: 0; }
+.reveal:not(.reveal-live) .reveal-mini .viewer-hint { opacity: 0; }
 .reveal-photo {
   opacity: clamp(0, calc(1.5 - var(--p) * 2.75), 1);
   pointer-events: none;
@@ -352,6 +352,7 @@ a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); 
 .pk-miss { align-self: center; margin-top: 16px; }
 .pk-stage { margin-top: 12px; aspect-ratio: 4/3; border-radius: 16px; overflow: hidden; background: var(--wall); position: relative; }
 .pk-stage > * { width: 100%; height: 100%; }
+.pk-stage .viewer { min-height: 0; }
 .pk-embed { border: 0; display: block; }
 .pk-empty { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 24px; text-align: center; font-size: 14px; }
 .pk-empty span { color: var(--muted); font-size: 13px; }

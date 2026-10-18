@@ -66,7 +66,8 @@ export default function Uploader() {
     const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: "-15% 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+    // La carte des photos n'existe qu'une fois la voiture choisie : on observe à ce moment-là.
+  }, [base]);
 
   useEffect(() => {
     if (!tour || !visible || !base) return;
@@ -110,7 +111,7 @@ export default function Uploader() {
     const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
 
     try {
-      if (!storage) {
+      if (storage === false) {
         // Mode démo : pas de stockage branché, on simule l'envoi.
         for (let p = 0; p <= 100; p += 20) {
           setProgress(p);
@@ -305,7 +306,7 @@ export default function Uploader() {
               <a href="/confidentialite" target="_blank">politique de confidentialité</a>).
             </span>
           </label>
-          <button className="cta full" disabled={!allPhotos || !emailOk || !consent || phase === "sending"} onClick={send}>
+          <button className="cta full" disabled={!allPhotos || !emailOk || !consent || storage === null || phase === "sending"} onClick={send}>
             {phase === "sending" ? `Envoi… ${progress} %` : "Envoyer ma voiture"}
           </button>
           {phase === "sending" && (
