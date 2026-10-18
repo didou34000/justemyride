@@ -21,6 +21,7 @@ const ICON: Record<string, ReactNode> = {
   analyse: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" />,
   valide: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12.5l2.7 2.7L16.5 9.5" />,
   pieces: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" />,
+  details: <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5M8.5 11h5M11 8.5v5" />,
   assemblage: <path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 16.5l9 5 9-5" />,
   rendu: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
   accord: <path d="M3 6h18v12H3zM3 10h18M7 15h4" />,
@@ -48,7 +49,7 @@ function Wire({ from, to }: { from: Step; to: Step }) {
 
 /** Ce qu'on voit dans le bloc pour une demande réelle. */
 function Preview({ step, order }: { step: Step; order: Order }) {
-  const { demande, analyse, meshy } = order;
+  const { demande, analyse, meshy, details } = order;
   const r = analyse?.result;
   switch (step.key) {
     case "photos": {
@@ -121,6 +122,26 @@ function Preview({ step, order }: { step: Step; order: Order }) {
           </>
         );
       return <span className="node-note">{HELP[step.key]}</span>;
+    }
+    case "details": {
+      const x = details?.result;
+      if (step.state === "error") return <span className="node-err">{details?.error ?? step.note}</span>;
+      if (step.busy) return <span className="node-live">Claude cherche les détails…</span>;
+      if (x)
+        return (
+          <>
+            <span className="node-big">
+              {x.manques.length} <small>détail{x.manques.length > 1 ? "s" : ""} manquant{x.manques.length > 1 ? "s" : ""}</small>
+            </span>
+            <span className="node-tags">
+              {x.manques.slice(0, 4).map((d, i) => (
+                <i key={i}>{d.detail}</i>
+              ))}
+            </span>
+          </>
+        );
+      if (step.state === "skip") return <span className="node-note">Pas de modèle Meshy à contrôler.</span>;
+      return <span className="node-note">{meshy?.glb ? "Part tout seul à l'ouverture de la demande." : HELP[step.key]}</span>;
     }
     default:
       if (step.state === "done") return <span className="node-ok">Fait le {day(step.date)}</span>;

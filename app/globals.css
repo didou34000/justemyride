@@ -374,6 +374,10 @@ a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); 
 .admin-diff.conf-haute { border-left-color: var(--ok); }
 .admin-diff.conf-moyenne { border-left-color: #c9962b; }
 .admin-diff.conf-basse { border-left-color: #b4483c; }
+.admin-diff.imp-haute { border-left-color: #ff4d1a; }
+.admin-diff.imp-moyenne { border-left-color: #c9962b; }
+.admin-diff.imp-basse { border-left-color: var(--line); }
+.notice.warn { margin-top: 8px; border-color: #ecd9a8; background: #fdf7e8; color: #7a5a12; }
 .admin-diff-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; text-transform: capitalize; }
 .admin-diff p { font-size: 14px; margin-bottom: 4px; }
 .admin-list { padding-left: 20px; font-size: 14px; display: grid; gap: 4px; }
