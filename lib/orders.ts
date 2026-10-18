@@ -97,8 +97,8 @@ export function buildSteps(
       return { ...base, state: "todo" as const };
     }
     if (def.key === "assemblage") {
-      // Ancien suivi coché à la main, ou miniature terminée déposée.
-      if (f.final || s.assemblage) return { ...base, state: "done" as const, date: s.assemblage, note: f.final ? "miniature déposée" : undefined };
+      // Fait seulement quand la miniature terminée est déposée (l'ancienne case cochée ne compte plus).
+      if (f.final) return { ...base, state: "done" as const, note: "miniature déposée" };
       return { ...base, state: "todo" as const };
     }
     const date = def.manual ? s[def.manual] : undefined;
