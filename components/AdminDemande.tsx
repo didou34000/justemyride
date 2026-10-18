@@ -493,9 +493,7 @@ export default function AdminDemande({ order }: { order: Order }) {
                   <a className="link" href={photoSrc(fichiers.final)} download={`miniature-${id}.glb`}>Télécharger</a>
                 </p>
               </>
-            ) : (
-              suivi.assemblage && <p className="node-ok">Coché comme fait le {day(suivi.assemblage)}</p>
-            )}
+            ) : null}
             <div className="admin-actions">
               <label className={`cta ${busy ? "off" : ""}`}>
                 {busy === "final" ? "Envoi…" : fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)"}
