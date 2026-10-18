@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { PayLogos } from "./HomeSections";
 
 export default function Footer() {
   return (
     <footer className="foot">
       <span>© {new Date().getFullYear()} JustMyRide</span>
+      <PayLogos small />
       <nav className="foot-links">
         <Link href="/configurer">Le garage</Link>
         <Link href="/cgv">CGV</Link>
