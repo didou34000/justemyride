@@ -1,6 +1,6 @@
 import { list } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
-import type { AnalysisRecord } from "@/lib/analyse";
+import { analyseConfigured, type AnalysisRecord } from "@/lib/analyse";
 import type { Job } from "@/lib/meshy";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
@@ -34,21 +34,25 @@ export type Order = {
 
 const suiviPath = (id: string) => `submissions/${id}/suivi.json`;
 
-export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, s: Suivi): Step[] {
+export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, s: Suivi, analyseOn = true): Step[] {
   const needsParts = a?.result?.differences.some((x) => x.traitement === "piece_3d");
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
     if (def.key === "photos") return { ...base, state: "done" as const, date: d.receivedAt, note: `${d.files.length} photos` };
     if (def.key === "analyse") {
+      if (!a && !analyseOn) return { ...base, state: "error" as const, note: "Clé Claude (ANTHROPIC_API_KEY) absente de Vercel : l'analyse ne peut pas partir." };
       if (!a) return { ...base, state: "todo" as const };
       if (a.status === "error") return { ...base, state: "error" as const, date: a.startedAt, note: a.error };
-      if (a.status === "running") return { ...base, state: "current" as const, date: a.startedAt, note: "en cours" };
+      // Une analyse « en cours » depuis plus de 10 min a été coupée (délai du serveur dépassé).
+      if (a.status === "running" && Date.now() - Date.parse(a.startedAt) > 600_000)
+        return { ...base, state: "error" as const, date: a.startedAt, note: "Analyse interrompue : relance-la." };
+      if (a.status === "running") return { ...base, state: "current" as const, date: a.startedAt, note: "en cours", busy: true };
       return { ...base, state: "done" as const, date: a.startedAt, note: `${a.result?.differences.length ?? 0} différence(s)` };
     }
     if (def.key === "pieces") {
       if (m?.glb || m?.status === "SUCCEEDED") return { ...base, state: "done" as const, date: m.startedAt, note: "modèle reçu" };
       if (m && ["FAILED", "CANCELED", "error"].includes(m.status)) return { ...base, state: "error" as const, date: m.startedAt, note: m.error };
-      if (m) return { ...base, state: "current" as const, date: m.startedAt, note: m.progress ? `${m.progress} %` : "en cours" };
+      if (m) return { ...base, state: "current" as const, date: m.startedAt, note: m.progress ? `${m.progress} %` : "en cours", busy: true };
       if (a?.status === "done" && !needsParts) return { ...base, state: "skip" as const, note: "aucune pièce à faire" };
       return { ...base, state: "todo" as const };
     }
@@ -69,7 +73,7 @@ export async function getOrder(id: string): Promise<Order | null> {
     readJson<Job>(`submissions/${id}/meshy.json`),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
-  const steps = buildSteps(demande, analyse, meshy, suivi);
+  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured());
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
   return { id, demande: { ...demande, id }, analyse, meshy, suivi, steps, progress };
 }

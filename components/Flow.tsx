@@ -38,6 +38,7 @@ export function StepIcon({ k }: { k: string }) {
 
 const BADGE: Record<Step["state"], string> = { done: "✓", current: "", todo: "", error: "!", skip: "–" };
 
+
 /** Trait entre deux blocs : vert si on est passé, animé s'il mène à l'étape en cours. */
 function Wire({ from, to }: { from: Step; to: Step }) {
   const passed = from.state === "done" || from.state === "skip";
@@ -66,8 +67,8 @@ function Preview({ step, order }: { step: Step; order: Order }) {
       );
     }
     case "analyse":
-      if (analyse?.status === "running") return <span className="node-live">Claude regarde les photos…</span>;
-      if (analyse?.status === "error") return <span className="node-err">{analyse.error}</span>;
+      if (step.state === "error") return <span className="node-err">{analyse?.error ?? step.note}</span>;
+      if (step.busy) return <span className="node-live">Claude regarde les photos…</span>;
       if (r)
         return (
           <>
@@ -150,7 +151,7 @@ export function Flow({ steps, order, selected, onSelect }: FlowProps) {
             {i > 0 && <Wire from={steps[i - 1]} to={s} />}
             <button
               type="button"
-              className={`node s-${s.state} t-${TONE[s.key]} ${selected === s.key ? "sel" : ""}`}
+              className={`node s-${s.state} t-${TONE[s.key]} ${s.busy ? "busy" : ""} ${selected === s.key ? "sel" : ""}`}
               onClick={onSelect ? () => onSelect(s.key) : undefined}
               disabled={!onSelect}
             >

@@ -30,7 +30,8 @@ export default function AdminDemande({ order }: { order: Order }) {
   const step = steps.find((s) => s.key === sel)!;
   const def = STEPS.find((s) => s.key === sel)!;
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
-  const running = analyse?.status === "running" || meshyRunning;
+  const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
+  const running = analyseBusy || meshyRunning;
 
   async function call(label: string, url: string, body: unknown, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -103,9 +104,9 @@ export default function AdminDemande({ order }: { order: Order }) {
 
         {sel === "analyse" && (
           <>
-            {!analyse && <p className="notice">Pas encore analysée.</p>}
-            {analyse?.status === "running" && <p className="notice">Claude regarde les photos, le résultat s&apos;affiche ici tout seul.</p>}
-            {analyse?.status === "error" && <p className="notice err">Analyse impossible : {analyse.error}</p>}
+            {!analyse && <p className={`notice ${step.state === "error" ? "err" : ""}`}>{step.state === "error" ? step.note : "Pas encore analysée."}</p>}
+            {analyseBusy && <p className="notice">Claude regarde les photos, le résultat s&apos;affiche ici tout seul.</p>}
+            {analyse && step.state === "error" && <p className="notice err">Analyse impossible : {analyse.error ?? step.note}</p>}
             {r && (
               <>
                 <p className="admin-resume">{r.resume}</p>
@@ -146,7 +147,7 @@ export default function AdminDemande({ order }: { order: Order }) {
             <div className="admin-actions">
               <button
                 className="cta ghost"
-                disabled={Boolean(busy) || analyse?.status === "running"}
+                disabled={Boolean(busy) || analyseBusy}
                 onClick={() => call("analyse", "/api/analyse", { id, force: Boolean(analyse) })}
               >
                 {busy === "analyse" ? "Analyse…" : analyse ? "Refaire l'analyse" : "Lancer l'analyse"}

@@ -6,7 +6,8 @@ export type ManualStep = (typeof MANUAL)[number];
 export type Suivi = Partial<Record<ManualStep, string>>;
 
 export type StepState = "done" | "current" | "todo" | "error" | "skip";
-export type Step = { key: string; label: string; who: string; state: StepState; date?: string; note?: string };
+/** busy : une machine travaille vraiment dessus (analyse, Meshy), pas seulement « à faire ». */
+export type Step = { key: string; label: string; who: string; state: StepState; date?: string; note?: string; busy?: boolean };
 
 /** Le parcours d'une commande, dans l'ordre. Sert aussi à la frise explicative. */
 /** Couleur du bloc selon qui agit (client, Claude, toi, Meshy, Blender, atelier). */
