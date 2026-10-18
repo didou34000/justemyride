@@ -1,7 +1,8 @@
 import { put } from "@vercel/blob";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
-import { notifyNewRequest } from "@/lib/notify";
+import { notifyAnalysis, notifyNewRequest } from "@/lib/notify";
+import { analyse, analyseConfigured } from "@/lib/analyse";
 import type { Base } from "@/lib/catalog";
 
 type Submission = {
@@ -12,6 +13,9 @@ type Submission = {
   mode: "photos";
   files: { slot: string; url: string; pathname: string }[];
 };
+
+// Laisse le temps à l'analyse des photos, lancée après la réponse au client.
+export const maxDuration = 300;
 
 /** Enregistre la demande (contact + liste des fichiers) à côté des fichiers envoyés. */
 export async function POST(request: Request) {
@@ -39,6 +43,18 @@ export async function POST(request: Request) {
     console.error("Alerte e-mail non envoyée :", msg);
     // Message Resend sans les adresses e-mail, pour diagnostiquer sans rien exposer.
     alert = `failed (${msg.replace(/[\w.+-]+@[\w.-]+/g, "***").slice(0, 220)})`;
+  }
+
+  // Le point automatique (Claude compare les photos à la base) : après la réponse, le client n'attend pas.
+  if (analyseConfigured()) {
+    after(async () => {
+      try {
+        const rec = await analyse(s.id);
+        await notifyAnalysis(s.id, s.car || s.base?.label || "Voiture", rec);
+      } catch (e) {
+        console.error("Analyse non faite :", (e as Error).message);
+      }
+    });
   }
 
   return NextResponse.json({ id: s.id, alert });

@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { readJson, writeJson } from "@/lib/blobJson";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 
 /**
@@ -32,20 +33,6 @@ export function isAdmin(request: Request) {
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
   return diff === 0;
 }
-
-async function readJson<T>(pathname: string): Promise<T | null> {
-  const r = await get(pathname, { access: BLOB_ACCESS, useCache: false }).catch(() => null);
-  if (!r || r.statusCode !== 200) return null;
-  return JSON.parse(await new Response(r.stream).text()) as T;
-}
-
-const writeJson = (pathname: string, data: unknown) =>
-  put(pathname, JSON.stringify(data, null, 2), {
-    access: BLOB_ACCESS,
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
 
 type Usage = { days: Record<string, number>; total: number };
 const usagePath = (d: Date) => `meshy/usage-${d.toISOString().slice(0, 7)}.json`;
