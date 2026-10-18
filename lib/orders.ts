@@ -3,6 +3,7 @@ import { readJson, writeJson } from "@/lib/blobJson";
 import { analyseConfigured, type AnalysisRecord } from "@/lib/analyse";
 import type { Job } from "@/lib/meshy";
 import type { DetailsRecord } from "@/lib/details";
+import { readFichiers, type Fichiers } from "@/lib/fichiers";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
@@ -29,6 +30,8 @@ export type Order = {
   analyse: AnalysisRecord | null;
   meshy: Job | null;
   details: DetailsRecord | null;
+  meshyLogos: Job | null;
+  fichiers: Fichiers;
   suivi: Suivi;
   steps: Step[];
   progress: number;
@@ -42,8 +45,12 @@ export function buildSteps(
   m: Job | null,
   s: Suivi,
   analyseOn = true,
-  x: DetailsRecord | null = null
+  x: DetailsRecord | null = null,
+  ml: Job | null = null,
+  f: Fichiers = {}
 ): Step[] {
+  const badges = x?.result?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
+  const noBadges = x?.status === "done" && !badges.length;
   const needsParts = a?.result?.differences.some((x) => x.traitement === "piece_3d");
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
@@ -77,6 +84,23 @@ export function buildSteps(
       if (x.status === "running") return { ...base, state: "current" as const, date: x.startedAt, note: "en cours", busy: true };
       return { ...base, state: "done" as const, date: x.startedAt, note: `${x.result?.manques.length ?? 0} détail(s)` };
     }
+    if (def.key === "logos") {
+      if (f.logos) return { ...base, state: "done" as const, note: "image déposée" };
+      if (noBadges || (!x && detailsSkipped(a, m, needsParts))) return { ...base, state: "skip" as const, note: "aucun badge à faire" };
+      return { ...base, state: "todo" as const, note: badges.length ? `${badges.length} badge(s)` : undefined };
+    }
+    if (def.key === "meshy_logos") {
+      if (ml?.glb || ml?.status === "SUCCEEDED") return { ...base, state: "done" as const, date: ml.startedAt, note: "logos reçus" };
+      if (ml && ["FAILED", "CANCELED", "error"].includes(ml.status)) return { ...base, state: "error" as const, date: ml.startedAt, note: ml.error };
+      if (ml) return { ...base, state: "current" as const, date: ml.startedAt, note: ml.progress ? `${ml.progress} %` : "en cours", busy: true };
+      if (!f.logos && (noBadges || (!x && detailsSkipped(a, m, needsParts)))) return { ...base, state: "skip" as const };
+      return { ...base, state: "todo" as const };
+    }
+    if (def.key === "assemblage") {
+      // Ancien suivi coché à la main, ou miniature terminée déposée.
+      if (f.final || s.assemblage) return { ...base, state: "done" as const, date: s.assemblage, note: f.final ? "miniature déposée" : undefined };
+      return { ...base, state: "todo" as const };
+    }
     const date = def.manual ? s[def.manual] : undefined;
     return { ...base, state: date ? ("done" as const) : ("todo" as const), date };
   });
@@ -92,15 +116,17 @@ const detailsSkipped = (a: AnalysisRecord | null, m: Job | null, needsParts?: bo
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [analyse, meshy, details, suivi] = await Promise.all([
+  const [analyse, meshy, details, meshyLogos, fichiers, suivi] = await Promise.all([
     readJson<AnalysisRecord>(`submissions/${id}/analyse.json`),
     readJson<Job>(`submissions/${id}/meshy.json`),
     readJson<DetailsRecord>(`submissions/${id}/details.json`),
+    readJson<Job>(`submissions/${id}/meshy-logos.json`),
+    readFichiers(id),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
-  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured(), details);
+  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured(), details, meshyLogos, fichiers);
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
-  return { id, demande: { ...demande, id }, analyse, meshy, details, suivi, steps, progress };
+  return { id, demande: { ...demande, id }, analyse, meshy, details, meshyLogos, fichiers, suivi, steps, progress };
 }
 
 /** Toutes les demandes, la plus récente d'abord. */
