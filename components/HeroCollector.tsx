@@ -7,16 +7,12 @@ export default function HeroCollector({ car, from, scale }: { car: Car; from: nu
   return (
     <section className="hero-c">
       <div className="hero-copy">
-        <p className="eyebrow">Atelier de miniatures sur mesure</p>
         <h1>
           Ta voiture,
           <br />
           <i>édition unique.</i>
         </h1>
-        <p className="lead">
-          Pas un modèle de série : la tienne, avec ses jantes, sa teinte et ses détails. Tu la personnalises en 3D, on la
-          fabrique, elle arrive chez toi prête à exposer.
-        </p>
+        <p className="lead">Pas un modèle de série : la tienne, recréée en 3D puis fabriquée en miniature.</p>
         <div className="hero-actions">
           <a href="#deposer" className="cta">
             Commencer ma miniature
@@ -44,8 +40,6 @@ export default function HeroCollector({ car, from, scale }: { car: Car; from: nu
             {car.make} {car.model}
           </b>
           <span className="coffret-scale">{scale.label}</span>
-          <span>Fais-la tourner</span>
-          <span>dès {scale.price} €</span>
         </figcaption>
       </figure>
     </section>

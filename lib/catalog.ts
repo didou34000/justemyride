@@ -27,7 +27,7 @@ export type Brand = {
   models: CarModel[];
 };
 
-export const brands: Brand[] = [
+const allBrands: Brand[] = [
   {
     id: "mini",
     name: "Mini",
@@ -104,34 +104,76 @@ export const brands: Brand[] = [
   },
   // Marques sans annuaire pour l'instant : le client passe directement par la recherche libre.
   ...[
+    ["ferrari", "Ferrari", "F"],
+    ["lamborghini", "Lamborghini", "L"],
+    ["porsche", "Porsche", "P"],
+    ["koenigsegg", "Koenigsegg", "K"],
+    ["mclaren", "McLaren", "M"],
+    ["bugatti", "Bugatti", "B"],
+    ["pagani", "Pagani", "P"],
+    ["aston-martin", "Aston Martin", "AM"],
+    ["mercedes", "Mercedes", "MB"],
+    ["audi", "Audi", "A"],
     ["volkswagen", "Volkswagen", "VW"],
     ["renault", "Renault", "R"],
     ["peugeot", "Peugeot", "P"],
-    ["audi", "Audi", "A"],
-    ["mercedes", "Mercedes", "MB"],
-    ["porsche", "Porsche", "P"],
+    ["citroen", "Citroën", "C"],
+    ["alpine", "Alpine", "A"],
     ["toyota", "Toyota", "T"],
+    ["nissan", "Nissan", "N"],
     ["honda", "Honda", "H"],
     ["subaru", "Subaru", "S"],
-    ["nissan", "Nissan", "N"],
-    ["citroen", "Citroën", "C"],
+    ["tesla", "Tesla", "T"],
     ["ford", "Ford", "F"],
+    ["maserati", "Maserati", "M"],
+    ["alfa-romeo", "Alfa Romeo", "AR"],
+    ["bentley", "Bentley", "B"],
+    ["rolls-royce", "Rolls-Royce", "RR"],
+    ["lotus", "Lotus", "L"],
+    ["jaguar", "Jaguar", "J"],
+    ["land-rover", "Land Rover", "LR"],
+    ["rimac", "Rimac", "R"],
+    ["abarth", "Abarth", "A"],
+    ["fiat", "Fiat", "F"],
+    ["lancia", "Lancia", "L"],
+    ["seat", "Seat", "S"],
+    ["cupra", "Cupra", "C"],
+    ["skoda", "Škoda", "Š"],
+    ["ds", "DS", "DS"],
+    ["dacia", "Dacia", "D"],
+    ["opel", "Opel", "O"],
+    ["volvo", "Volvo", "V"],
+    ["kia", "Kia", "K"],
+    ["hyundai", "Hyundai", "H"],
+    ["mazda", "Mazda", "M"],
+    ["mitsubishi", "Mitsubishi", "M"],
+    ["suzuki", "Suzuki", "S"],
+    ["lexus", "Lexus", "L"],
+    ["jeep", "Jeep", "J"],
   ].map(([id, name, mark]) => ({ id, name, mark, models: [] })),
 ];
+
+/** Ordre d'affichage : les marques qui font rêver d'abord, puis les plus courantes en France. */
+const ORDER = "ferrari lamborghini porsche bmw mercedes audi koenigsegg mclaren bugatti aston-martin pagani mini volkswagen renault peugeot citroen alpine toyota nissan honda subaru tesla ford".split(" ");
+const rank = (id: string) => (ORDER.includes(id) ? ORDER.indexOf(id) : ORDER.length);
+export const brands: Brand[] = [...allBrands].sort((a, b) => rank(a.id) - rank(b.id));
 
 /**
  * Logo officiel de la marque, affiché seulement pour que le client reconnaisse sa marque
  * (sélecteur et garage). Jamais sur les rendus des miniatures ni dans la publicité :
  * voir juridique-logos-et-formes.md. Fichiers dans public/brands/.
  */
-const LOGOS = new Set(["mini", "bmw", "volkswagen", "renault", "peugeot", "audi", "mercedes", "porsche", "toyota", "honda", "subaru", "nissan", "citroen", "ford"]);
+const LOGOS = new Set(
+  "mini bmw volkswagen renault peugeot audi mercedes porsche toyota honda subaru nissan citroen ford ferrari lamborghini koenigsegg mclaren bugatti pagani aston-martin bentley rolls-royce maserati alfa-romeo alpine lotus tesla land-rover jeep fiat seat cupra skoda kia hyundai mazda volvo dacia opel ds lexus mitsubishi suzuki abarth jaguar lancia rimac".split(" ")
+);
 
 export function brandLogo(nameOrId: string): string | undefined {
   const id = nameOrId
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z]/g, "");
+    .replace(/[^a-z]+/g, "-")
+    .replace(/^-|-$/g, "");
   const key = id === "vw" ? "volkswagen" : id.startsWith("mercedes") ? "mercedes" : id;
   return LOGOS.has(key) ? `/brands/${key}.png` : undefined;
 }

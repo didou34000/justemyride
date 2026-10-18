@@ -43,6 +43,7 @@ export default function CarPicker({ onPick }: { onPick: (b: Base) => void }) {
   const [gen, setGen] = useState<Generation | null>(null);
   const [hit, setHit] = useState<SketchfabHit | null>(null);
   const [manual, setManual] = useState("");
+  const [allBrands, setAllBrands] = useState(false);
 
   const back: Partial<Record<View, View>> = {
     model: "brand",
@@ -104,25 +105,32 @@ export default function CarPicker({ onPick }: { onPick: (b: Base) => void }) {
 
   return (
     <div className="picker">
-      <div className="wz-head">
-        <span>Étape 1 : ta voiture</span>
-        {view !== "preview" && <span className="wz-count">{[brand?.name, model && short(model.name, brand?.name)].filter(Boolean).join(" · ")}</span>}
-      </div>
+      {view !== "brand" && view !== "preview" && brand && (
+        <div className="wz-head">
+          <span className="wz-count">{[brand.name, model && short(model.name, brand.name)].filter(Boolean).join(" · ")}</span>
+        </div>
+      )}
 
       {view === "brand" && (
         <>
           <h2 className="wz-title">Quelle marque ?</h2>
           <div className="pk-brands">
-            {brands.map((b) => (
+            {(allBrands ? brands : brands.slice(0, 15)).map((b) => (
               <button key={b.id} className="pk-brand" onClick={() => pickBrand(b)}>
                 <BrandMark id={b.id} mark={b.mark} />
                 <span>{b.name}</span>
               </button>
             ))}
           </div>
-          <button className="link pk-miss" onClick={() => { setBrand(null); setView("search"); }}>
-            Autre marque
-          </button>
+          {allBrands ? (
+            <button className="link pk-miss" onClick={() => { setBrand(null); setView("search"); }}>
+              Autre marque
+            </button>
+          ) : (
+            <button className="cta ghost pk-more" onClick={() => setAllBrands(true)}>
+              Voir les {brands.length} marques
+            </button>
+          )}
         </>
       )}
 
