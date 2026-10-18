@@ -4,6 +4,7 @@ import Uploader from "@/components/Uploader";
 import HeroCollector from "@/components/HeroCollector";
 import BrandGrid from "@/components/BrandGrid";
 import StickyCta from "@/components/StickyCta";
+import Showcase3D from "@/components/Showcase3D";
 import { BeforeAfter, Faq, Finishes, HowItWorks, Sizes, TrustBar } from "@/components/HomeSections";
 import { cars } from "@/lib/cars";
 import { sizes } from "@/lib/options";
@@ -19,6 +20,7 @@ export default function Home() {
 
       <HeroCollector car={example} from={from} scale={heroScale} />
       <TrustBar />
+      <Showcase3D car={example} />
       <BrandGrid />
       <BeforeAfter />
       <HowItWorks />
@@ -26,7 +28,6 @@ export default function Home() {
       <Finishes />
 
       <section className="start" id="deposer">
-        <p className="eyebrow">C'est parti</p>
         <h2>
           Ta voiture, 8 photos, <i>on s'occupe du reste.</i>
         </h2>

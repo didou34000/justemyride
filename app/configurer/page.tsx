@@ -2,7 +2,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
 import CarSearch from "@/components/CarSearch";
-import { LogoMark } from "@/components/Logo";
+import { CarGlyph } from "@/components/Logo";
 import { brandLogo } from "@/lib/catalog";
 import Footer from "@/components/Footer";
 
@@ -13,16 +13,12 @@ export default function GaragePage() {
     <main>
       <Nav link={{ href: "/#deposer", label: "Envoyer ma voiture" }} />
       <section className="garage">
-        <p className="eyebrow">Étape 1 · La base</p>
         <h2>
           Choisis <i>ta</i> voiture
         </h2>
-        <p className="lead">
-          Tu choisis ici seulement le modèle de base. Jantes, échappement et couleur se règlent à l'étape suivante, sur
-          ta miniature en 3D.
-        </p>
+        <p className="lead">Jantes, échappement et couleur se règlent juste après, en 3D.</p>
         <CarSearch />
-        <p className="eyebrow garage-sub">Prêtes à personnaliser</p>
+        <h3 className="garage-sub">Prêtes à personnaliser</h3>
         <div className="garage-grid">
           {cars.map((car) =>
             car.available ? (
@@ -39,7 +35,7 @@ export default function GaragePage() {
             ) : (
               <Link key={car.slug} href="/#deposer" className="car-card soon">
                 <div className="noimg soon-mark">
-                  {brandLogo(car.make) ? <img src={brandLogo(car.make)} alt="" /> : <LogoMark size={56} />}
+                  {brandLogo(car.make) ? <img src={brandLogo(car.make)} alt="" /> : <CarGlyph size={56} />}
                 </div>
                 <div className="car-card-body">
                   <strong>

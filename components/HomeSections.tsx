@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoMark } from "./Logo";
+import { CarGlyph } from "./Logo";
 import { accessories, sizes } from "@/lib/options";
 import { LEAD_TIME, SELLER } from "@/lib/legal";
 
@@ -46,21 +46,18 @@ export function PayLogos({ small }: { small?: boolean }) {
 
 export function TrustBar() {
   const items = [
-    [icon.unique, "Pièce unique", "Fabriquée sur mesure, d'après ta voiture."],
-    [icon.truck, "Livraison offerte en France", `Expédiée sous ${LEAD_TIME}.`],
-    [icon.shield, "Refaite ou remboursée", "Abîmée ou non conforme à l'arrivée ? On s'en occupe."],
-    [icon.lock, "Paiement sécurisé", "Par Shopify. Carte, PayPal, Klarna."],
+    [icon.unique, "Pièce unique"],
+    [icon.truck, "Livraison offerte"],
+    [icon.shield, "Refaite ou remboursée"],
+    [icon.lock, "Paiement sécurisé"],
   ] as const;
   return (
     <section className="trust" aria-label="Nos garanties">
       <ul className="trust-grid">
-        {items.map(([d, t, s]) => (
+        {items.map(([d, t]) => (
           <li key={t}>
             <Icon d={d} />
-            <div>
-              <b>{t}</b>
-              <span>{s}</span>
-            </div>
+            <b>{t}</b>
           </li>
         ))}
       </ul>
@@ -71,14 +68,15 @@ export function TrustBar() {
 
 export function HowItWorks() {
   const steps = [
-    ["Choisis ta voiture", "Dans le garage, ou envoie 8 photos si elle n'y est pas : on la modélise pour toi."],
-    ["Personnalise-la en 3D", "Teinte, finition, jantes, échappement, étriers. Tu vois le résultat avant de payer."],
-    ["On la fabrique", `Pièce unique, à l'échelle choisie, expédiée sous ${LEAD_TIME} et livrée chez toi.`],
+    ["Ta voiture", "Choisis-la, ou envoie 8 photos."],
+    ["En 3D", "On la recrée, tu la personnalises."],
+    ["En vrai", `Expédiée sous ${LEAD_TIME}, chez toi.`],
   ];
   return (
     <section className="home-block">
-      <p className="eyebrow">Comment ça marche</p>
-      <h2>De ta voiture à ton étagère, en 3 étapes.</h2>
+      <h2>
+        3 étapes, <i>c'est tout.</i>
+      </h2>
       <ol className="steps3">
         {steps.map(([t, d], i) => (
           <li key={t}>
@@ -95,7 +93,6 @@ export function HowItWorks() {
 export function BeforeAfter() {
   return (
     <section className="home-block">
-      <p className="eyebrow">L'idée</p>
       <h2>
         Ta photo devient <i>ta miniature.</i>
       </h2>
@@ -119,14 +116,13 @@ export function BeforeAfter() {
 export function Sizes() {
   return (
     <section className="home-block" id="tailles">
-      <p className="eyebrow">Trois tailles</p>
       <h2>Du bureau à la vitrine.</h2>
       <ul className="size-cards">
         {sizes.map((s, i) => (
           <li key={s.id} className={s.id === "1-24" ? "pop" : ""}>
-            {s.id === "1-24" && <em>Notre conseil</em>}
+            {s.id === "1-24" && <em>Conseillée</em>}
             <div className="size-visual" aria-hidden>
-              <LogoMark size={[30, 46, 62][i]} />
+              <CarGlyph size={[30, 46, 62][i]} />
             </div>
             <strong>{s.label}</strong>
             <span>{s.length} de long</span>
@@ -148,7 +144,6 @@ export function Finishes() {
   ];
   return (
     <section className="home-block">
-      <p className="eyebrow">Les finitions</p>
       <h2>Prête à exposer.</h2>
       <ul className="finish-grid">
         {items.map(([src, t, d]) => (
@@ -202,7 +197,6 @@ export function Faq() {
   ];
   return (
     <section className="home-block faq" id="faq">
-      <p className="eyebrow">Questions fréquentes</p>
       <h2>Tout ce qu'on nous demande.</h2>
       <div className="faq-list">
         {qa.map(([q, a]) => (
