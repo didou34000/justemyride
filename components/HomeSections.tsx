@@ -82,7 +82,7 @@ export function HowItWorks() {
       <ol className="steps3">
         {steps.map(([t, d], i) => (
           <li key={t}>
-            <span className="num">{i + 1}</span>
+            <span className="num">{String(i + 1).padStart(2, "0")}</span>
             <h3>{t}</h3>
             <p>{d}</p>
           </li>
@@ -92,9 +92,33 @@ export function HowItWorks() {
   );
 }
 
-export function Sizes() {
+export function BeforeAfter() {
   return (
     <section className="home-block">
+      <p className="eyebrow">L'idée</p>
+      <h2>
+        Ta photo devient <i>ta miniature.</i>
+      </h2>
+      <div className="ba">
+        <figure>
+          <img src="/hero/photo.jpg" alt="Un conducteur prend sa voiture en photo" loading="lazy" />
+          <figcaption>Tu prends ta voiture en photo</figcaption>
+        </figure>
+        <span className="ba-arrow" aria-hidden>
+          →
+        </span>
+        <figure>
+          <img src="/shop/socle-noir-grave.jpg" alt="La même voiture en miniature sur un socle noir gravé" loading="lazy" />
+          <figcaption>On en fait ta miniature</figcaption>
+        </figure>
+      </div>
+    </section>
+  );
+}
+
+export function Sizes() {
+  return (
+    <section className="home-block" id="tailles">
       <p className="eyebrow">Trois tailles</p>
       <h2>Du bureau à la vitrine.</h2>
       <ul className="size-cards">
@@ -177,7 +201,7 @@ export function Faq() {
     ],
   ];
   return (
-    <section className="home-block faq">
+    <section className="home-block faq" id="faq">
       <p className="eyebrow">Questions fréquentes</p>
       <h2>Tout ce qu'on nous demande.</h2>
       <div className="faq-list">

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Instrument_Serif, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { SELLER } from "@/lib/legal";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
 const description =
   "Transforme ta voiture en miniature unique. Envoie tes photos, personnalise-la en 3D, on la fabrique et on te la livre.";
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={inter.variable}>
+    <html lang="fr" className={`${sans.variable} ${serif.variable}`}>
       <body>{children}</body>
     </html>
   );
