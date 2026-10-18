@@ -34,7 +34,7 @@ export type Order = {
 
 const suiviPath = (id: string) => `submissions/${id}/suivi.json`;
 
-function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, s: Suivi): Step[] {
+export function buildSteps(d: Demande, a: AnalysisRecord | null, m: Job | null, s: Suivi): Step[] {
   const needsParts = a?.result?.differences.some((x) => x.traitement === "piece_3d");
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
