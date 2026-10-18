@@ -1,5 +1,5 @@
-import Link from "next/link";
 import Nav from "@/components/Nav";
+import Footer from "@/components/Footer";
 import Uploader from "@/components/Uploader";
 import HeroReveal from "@/components/HeroReveal";
 import { cars } from "@/lib/cars";
@@ -20,12 +20,7 @@ export default function Home() {
         <Uploader />
       </section>
 
-      <footer className="foot">
-        <span>© {new Date().getFullYear()} JustMyRide</span>
-        <Link href="/configurer" className="link">
-          Le garage
-        </Link>
-      </footer>
+      <Footer />
     </main>
   );
 }

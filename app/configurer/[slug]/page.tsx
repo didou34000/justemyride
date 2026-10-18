@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Configurator3D from "@/components/Configurator3D";
 import Nav from "@/components/Nav";
+import Footer from "@/components/Footer";
 import { carBySlug, cars } from "@/lib/cars";
 
 export function generateStaticParams() {
@@ -28,7 +29,7 @@ export default async function CarPage({ params }: { params: Promise<{ slug: stri
           roles: car.roles,
         }}
       />
-      <footer className="foot">© {new Date().getFullYear()} JustMyRide</footer>
+      <Footer />
     </main>
   );
 }

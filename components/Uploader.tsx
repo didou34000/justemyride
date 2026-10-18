@@ -33,6 +33,7 @@ export default function Uploader() {
   const [photos, setPhotos] = useState<Partial<Record<AngleId, File>>>({});
   const [details, setDetails] = useState<File[]>([]);
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [car, setCar] = useState("");
   // Étape 0 : la voiture de base, choisie avant les photos.
   const [base, setBase] = useState<Base | null>(null);
@@ -297,7 +298,14 @@ export default function Uploader() {
             <input placeholder="Ta voiture (ex. Golf 8 GTI 2021)" value={car} onChange={(e) => setCar(e.target.value)} />
             <input type="email" placeholder="Ton email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <button className="cta full" disabled={!allPhotos || !emailOk || phase === "sending"} onClick={send}>
+          <label className="consent">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>
+              J'accepte que mes photos servent à modéliser ma voiture (voir la{" "}
+              <a href="/confidentialite" target="_blank">politique de confidentialité</a>).
+            </span>
+          </label>
+          <button className="cta full" disabled={!allPhotos || !emailOk || !consent || phase === "sending"} onClick={send}>
             {phase === "sending" ? `Envoi… ${progress} %` : "Envoyer ma voiture"}
           </button>
           {phase === "sending" && (

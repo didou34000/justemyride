@@ -322,6 +322,13 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
           </div>
         )}
 
+        {!next && (
+          <p className="order-note">
+            Pièce unique fabriquée sur mesure : pas de droit de rétractation (art. L221-28 3° du Code de la
+            consommation). Abîmée ou non conforme, on la refait ou on te rembourse. <a href="/cgv" target="_blank">CGV</a>
+          </p>
+        )}
+
         <div className="checkout">
           <div>
             <small>

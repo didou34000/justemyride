@@ -39,10 +39,8 @@ export async function POST(request: Request) {
   try {
     alert = await notifyNewRequest(s);
   } catch (e) {
-    const msg = (e as Error).message;
-    console.error("Alerte e-mail non envoyée :", msg);
-    // Message Resend sans les adresses e-mail, pour diagnostiquer sans rien exposer.
-    alert = `failed (${msg.replace(/[\w.+-]+@[\w.-]+/g, "***").slice(0, 220)})`;
+    console.error("Alerte e-mail non envoyée :", (e as Error).message);
+    alert = "failed";
   }
 
   // Le point automatique (Claude compare les photos à la base) : après la réponse, le client n'attend pas.

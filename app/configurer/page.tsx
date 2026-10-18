@@ -3,6 +3,7 @@ import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
 import CarSearch from "@/components/CarSearch";
 import { LogoMark } from "@/components/Logo";
+import Footer from "@/components/Footer";
 
 export const metadata = { title: "Choisis ta voiture — JustMyRide" };
 
@@ -50,7 +51,7 @@ export default function GaragePage() {
         </div>
         <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/#deposer" className="link">Envoie-nous des photos</Link>.</p>
       </section>
-      <footer className="foot"><span>© {new Date().getFullYear()} JustMyRide</span></footer>
+      <Footer />
     </main>
   );
 }
