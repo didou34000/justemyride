@@ -3,6 +3,7 @@ import { readJson, writeJson } from "@/lib/blobJson";
 export { isAdmin } from "@/lib/adminAuth";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 import { MESHY_VIEWS } from "@/lib/steps";
+import { readFichiers } from "@/lib/fichiers";
 
 /**
  * Génération 3D Meshy (multi-photos → GLB), côté serveur uniquement.
@@ -15,7 +16,16 @@ import { MESHY_VIEWS } from "@/lib/steps";
  * Le vrai plafond reste le solde du compte Meshy : ne pas activer la recharge automatique.
  */
 
-const API = "https://api.meshy.ai/openapi/v1/multi-image-to-3d";
+/**
+ * Deux générations par demande : la voiture (multi-vues, les 4 faces) et les logos
+ * (une seule image des badges, préparée par Claude et déposée par le propriétaire).
+ */
+export type MeshyKind = "car" | "logos";
+const KINDS: Record<MeshyKind, { api: string; file: string }> = {
+  car: { api: "https://api.meshy.ai/openapi/v1/multi-image-to-3d", file: "meshy" },
+  logos: { api: "https://api.meshy.ai/openapi/v1/image-to-3d", file: "meshy-logos" },
+};
+export const isMeshyKind = (k: unknown): k is MeshyKind => k === "car" || k === "logos";
 // Les 4 faces nourrissent le multi-vues (Meshy en accepte 4 au maximum).
 const VIEWS = MESHY_VIEWS;
 
@@ -51,11 +61,11 @@ export type Job = {
   startedAt: string;
 };
 
-const jobPath = (id: string) => `submissions/${id}/meshy.json`;
-export const readJob = (id: string) => readJson<Job>(jobPath(id));
+const jobPath = (id: string, kind: MeshyKind) => `submissions/${id}/${KINDS[kind].file}.json`;
+export const readJob = (id: string, kind: MeshyKind = "car") => readJson<Job>(jobPath(id, kind));
 
-async function meshy(path: string, init?: RequestInit) {
-  const res = await fetch(`${API}${path}`, {
+async function meshy(kind: MeshyKind, path: string, init?: RequestInit) {
+  const res = await fetch(`${KINDS[kind].api}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${process.env.MESHY_API_KEY}`, "Content-Type": "application/json" },
     cache: "no-store",
@@ -75,39 +85,42 @@ async function asDataUri(pathname: string) {
 }
 
 /** Lance une génération pour une demande client, si tous les garde-fous passent. */
-export async function startJob(id: string): Promise<Job> {
-  if (await readJob(id)) throw new Error("Une génération existe déjà pour cette demande");
+export async function startJob(id: string, kind: MeshyKind = "car"): Promise<Job> {
+  if (await readJob(id, kind)) throw new Error("Une génération existe déjà pour cette demande");
 
   const now = new Date();
   const u = await usage(now);
   if (u.today >= DAILY_LIMIT) throw new Error(`Plafond du jour atteint (${DAILY_LIMIT})`);
   if (u.month >= MONTHLY_LIMIT) throw new Error(`Plafond du mois atteint (${MONTHLY_LIMIT})`);
 
-  const demande = await readJson<{ files: { slot: string; pathname: string }[] }>(`submissions/${id}/demande.json`);
-  if (!demande) throw new Error("Demande introuvable");
-  const photos = VIEWS.map((v) => demande.files.find((f) => f.slot === v)?.pathname).filter(Boolean) as string[];
-  if (photos.length < 2) throw new Error("Il faut au moins 2 des 4 faces (avant, gauche, arrière, droite)");
+  let photos: string[];
+  if (kind === "logos") {
+    const logos = (await readFichiers(id)).logos;
+    if (!logos) throw new Error("Dépose d'abord l'image des logos");
+    photos = [logos];
+  } else {
+    const demande = await readJson<{ files: { slot: string; pathname: string }[] }>(`submissions/${id}/demande.json`);
+    if (!demande) throw new Error("Demande introuvable");
+    photos = VIEWS.map((v) => demande.files.find((f) => f.slot === v)?.pathname).filter(Boolean) as string[];
+    if (photos.length < 2) throw new Error("Il faut au moins 2 des 4 faces (avant, gauche, arrière, droite)");
+  }
 
   // Réservation avant l'appel : un double clic ne lance pas deux générations payantes.
   const texture = process.env.MESHY_TEXTURE === "1";
   const job: Job = { status: "starting", startedAt: now.toISOString(), inputs: photos, texture };
-  await writeJson(jobPath(id), job);
+  await writeJson(jobPath(id, kind), job);
 
   try {
-    const { result } = await meshy("", {
-      method: "POST",
-      body: JSON.stringify({
-        image_urls: await Promise.all(photos.map(asDataUri)),
-        // La texture coûte des crédits en plus et on repeint la voiture nous-mêmes.
-        should_texture: texture,
-      }),
-    });
+    const images = await Promise.all(photos.map(asDataUri));
+    // La texture coûte des crédits en plus et on repeint nous-mêmes.
+    const body = kind === "logos" ? { image_url: images[0], should_texture: texture } : { image_urls: images, should_texture: texture };
+    const { result } = await meshy(kind, "", { method: "POST", body: JSON.stringify(body) });
     job.status = "PENDING";
     job.taskId = result;
   } catch (e) {
     job.status = "error";
     job.error = (e as Error).message;
-    await writeJson(jobPath(id), job);
+    await writeJson(jobPath(id, kind), job);
     throw e;
   }
 
@@ -115,22 +128,23 @@ export async function startJob(id: string): Promise<Job> {
   u.raw.days[day] = (u.raw.days[day] ?? 0) + 1;
   u.raw.total += 1;
   await writeJson(usagePath(now), u.raw);
-  await writeJson(jobPath(id), job);
+  await writeJson(jobPath(id, kind), job);
   return job;
 }
 
 /** Met à jour l'état ; une fois prêt, copie le GLB dans le stockage (les liens Meshy expirent). */
-export async function refreshJob(id: string): Promise<Job | null> {
-  const job = await readJob(id);
+export async function refreshJob(id: string, kind: MeshyKind = "car"): Promise<Job | null> {
+  const job = await readJob(id, kind);
+  const file = `submissions/${id}/${KINDS[kind].file}`;
   if (!job?.taskId || ["FAILED", "CANCELED", "error"].includes(job.status)) return job;
   if (job.glb && job.thumb) return job;
 
-  const t = await meshy(`/${job.taskId}`);
+  const t = await meshy(kind, `/${job.taskId}`);
   // Aperçu image (aussi rattrapé pour les générations finies avant que l'on garde l'aperçu).
   if (!job.thumb && t.thumbnail_url) {
     const img = await fetch(t.thumbnail_url).catch(() => null);
     if (img?.ok) {
-      const saved = await put(`submissions/${id}/meshy.png`, Buffer.from(await img.arrayBuffer()), {
+      const saved = await put(`${file}.png`, Buffer.from(await img.arrayBuffer()), {
         access: BLOB_ACCESS,
         contentType: img.headers.get("content-type") || "image/png",
         addRandomSuffix: false,
@@ -140,7 +154,7 @@ export async function refreshJob(id: string): Promise<Job | null> {
     }
   }
   if (job.glb) {
-    await writeJson(jobPath(id), job);
+    await writeJson(jobPath(id, kind), job);
     return job;
   }
   job.status = t.status;
@@ -149,7 +163,7 @@ export async function refreshJob(id: string): Promise<Job | null> {
   if (t.status === "SUCCEEDED" && t.model_urls?.glb) {
     const glb = await fetch(t.model_urls.glb);
     if (!glb.ok) throw new Error("Téléchargement du GLB impossible");
-    const saved = await put(`submissions/${id}/meshy.glb`, Buffer.from(await glb.arrayBuffer()), {
+    const saved = await put(`${file}.glb`, Buffer.from(await glb.arrayBuffer()), {
       access: BLOB_ACCESS,
       contentType: "model/gltf-binary",
       addRandomSuffix: false,
@@ -157,6 +171,6 @@ export async function refreshJob(id: string): Promise<Job | null> {
     });
     job.glb = saved.pathname;
   }
-  await writeJson(jobPath(id), job);
+  await writeJson(jobPath(id, kind), job);
   return job;
 }

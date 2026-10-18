@@ -22,6 +22,8 @@ const ICON: Record<string, ReactNode> = {
   valide: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12.5l2.7 2.7L16.5 9.5" />,
   pieces: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" />,
   details: <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5M8.5 11h5M11 8.5v5" />,
+  logos: <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8-4.3-4.1 5.9-.9z" />,
+  meshy_logos: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM9 12.5l2 2 4-4" />,
   assemblage: <path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 16.5l9 5 9-5" />,
   rendu: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
   accord: <path d="M3 6h18v12H3zM3 10h18M7 15h4" />,
@@ -49,7 +51,7 @@ function Wire({ from, to }: { from: Step; to: Step }) {
 
 /** Ce qu'on voit dans le bloc pour une demande réelle. */
 function Preview({ step, order }: { step: Step; order: Order }) {
-  const { demande, analyse, meshy, details } = order;
+  const { demande, analyse, meshy, details, meshyLogos, fichiers } = order;
   const r = analyse?.result;
   switch (step.key) {
     case "photos": {
@@ -143,6 +145,59 @@ function Preview({ step, order }: { step: Step; order: Order }) {
       if (step.state === "skip") return <span className="node-note">Pas de modèle Meshy à contrôler.</span>;
       return <span className="node-note">{meshy?.glb ? "Part tout seul à l'ouverture de la demande." : HELP[step.key]}</span>;
     }
+    case "logos": {
+      const badges = details?.result?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
+      if (fichiers.logos)
+        return (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="node-thumb wide" src={photoSrc(fichiers.logos)} alt="Image des logos" loading="lazy" />
+            <span className="node-ok">Image déposée</span>
+          </>
+        );
+      if (step.state === "skip") return <span className="node-note">Aucun badge à refaire.</span>;
+      if (badges.length)
+        return (
+          <>
+            <span className="node-big">
+              {badges.length} <small>badge{badges.length > 1 ? "s" : ""}</small>
+            </span>
+            <span className="node-tags">
+              {badges.slice(0, 3).map((b, i) => (
+                <i key={i}>{b.detail}</i>
+              ))}
+            </span>
+          </>
+        );
+      return <span className="node-note">{HELP[step.key]}</span>;
+    }
+    case "meshy_logos":
+      if (meshyLogos?.glb || meshyLogos?.status === "SUCCEEDED")
+        return (
+          <>
+            {meshyLogos.thumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="node-thumb" src={photoSrc(meshyLogos.thumb)} alt="Logos Meshy" loading="lazy" />
+            )}
+            <span className="node-ok">Logos 3D reçus</span>
+          </>
+        );
+      if (meshyLogos && step.state === "error") return <span className="node-err">{meshyLogos.error ?? meshyLogos.status}</span>;
+      if (meshyLogos)
+        return (
+          <>
+            <span className="node-live">Meshy travaille… {meshyLogos.progress ?? 0} %</span>
+            <span className="node-bar">
+              <i style={{ width: `${meshyLogos.progress ?? 4}%` }} />
+            </span>
+          </>
+        );
+      if (step.state === "skip") return <span className="node-note">Pas de logos à générer.</span>;
+      return <span className="node-note">{fichiers.logos ? "Image prête : à lancer." : "Attend l'image des logos."}</span>;
+    case "assemblage":
+      if (fichiers.final) return <span className="node-ok">Miniature déposée, à regarder</span>;
+      if (step.state === "done") return <span className="node-ok">Fait le {day(step.date)}</span>;
+      return <span className="node-note">{step.state === "current" ? "À faire : Claude assemble dans le chat." : HELP[step.key]}</span>;
     default:
       if (step.state === "done") return <span className="node-ok">Fait le {day(step.date)}</span>;
       if (step.state === "current")

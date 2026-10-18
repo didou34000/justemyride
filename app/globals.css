@@ -611,6 +611,9 @@ a.car-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); 
 
 /* Page 404 */
 .notfound { min-height: 60vh; }
+.node-thumb.wide { aspect-ratio: 8/3; object-fit: contain; background: #fff; }
+label.cta { cursor: pointer; }
+label.cta.off { opacity: .5; pointer-events: none; }
 
 /* ---------- Direction « Édition collector » ---------- */
 ::selection { background: var(--red); color: #fff; }

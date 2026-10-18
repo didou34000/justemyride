@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
+import { upload, uploadPresigned } from "@vercel/blob/client";
+import { BLOB_ACCESS } from "@/lib/storage";
 import { useRouter } from "next/navigation";
 import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
@@ -30,7 +32,7 @@ const day = (iso?: string) =>
 /** Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi. */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, analyse, meshy, details, suivi, steps } = order;
+  const { id, demande, analyse, meshy, details, meshyLogos, fichiers, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "photos";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -41,8 +43,10 @@ export default function AdminDemande({ order }: { order: Order }) {
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
   const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
   const detailsBusy = Boolean(steps.find((s) => s.key === "details")?.busy);
-  const running = analyseBusy || meshyRunning || detailsBusy;
+  const logosRunning = Boolean(steps.find((s) => s.key === "meshy_logos")?.busy);
+  const running = analyseBusy || meshyRunning || detailsBusy || logosRunning;
   const x = details?.result;
+  const badges = x?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
 
   const pieces = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
   const meshyInputs =
@@ -82,6 +86,37 @@ export default function AdminDemande({ order }: { order: Order }) {
     }
   });
 
+  // Dépôt d'un fichier par le propriétaire : envoi direct vers le stockage, puis enregistrement dans la demande.
+  async function pick(e: ChangeEvent<HTMLInputElement>, kind: "logos" | "final") {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(kind);
+    setError("");
+    try {
+      const { mode } = await fetch("/api/storage").then((r) => r.json());
+      const ext = kind === "final" ? "glb" : (file.name.split(".").pop()?.toLowerCase() ?? "png").replace("jpeg", "jpg");
+      const send = mode === "oidc" ? uploadPresigned : upload;
+      const blob = await send(`submissions/${id}/${kind}.${ext}`, file, {
+        access: BLOB_ACCESS,
+        handleUploadUrl: "/api/admin/upload",
+        contentType: kind === "final" ? "model/gltf-binary" : file.type,
+        multipart: mode === "token" && file.size > 20 * 1024 * 1024,
+      });
+      const res = await fetch("/api/admin/fichier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, kind, pathname: blob.pathname }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? `Erreur ${res.status}`);
+    } catch (err) {
+      setError(`Envoi impossible : ${(err as Error).message}`);
+    }
+    setBusy("");
+    router.refresh();
+  }
+
   async function call(label: string, url: string, body: unknown, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
     setBusy(label);
@@ -111,7 +146,10 @@ export default function AdminDemande({ order }: { order: Order }) {
             )}
           </p>
         </div>
-        <LiveRefresh every={running ? 8 : 30} poll={meshyRunning ? `/api/meshy?id=${id}` : undefined} />
+        <LiveRefresh
+          every={running ? 8 : 30}
+          poll={meshyRunning ? `/api/meshy?id=${id}` : logosRunning ? `/api/meshy?id=${id}&kind=logos` : undefined}
+        />
       </div>
 
       <Flow
@@ -340,28 +378,131 @@ export default function AdminDemande({ order }: { order: Order }) {
           </>
         )}
 
-        {sel === "assemblage" && (
-          <div className="notice">
-            <b>Rien ne se fait tout seul ici pour l&apos;instant.</b> Le site tourne sur Vercel, qui ne peut pas faire tourner Blender. L&apos;assemblage
-            (pose des pièces sur la base, couleurs, décalques) se fait à la main : Claude le fait dans Blender, dans le chat du projet.{" "}
-            {meshy?.glb ? (
+        {sel === "logos" && (
+          <>
+            {badges.length > 0 && (
               <>
-                Télécharge{" "}
-                <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>le modèle Meshy</a>
-                {demande.base?.uid && (
-                  <>
-                    {" "}et{" "}
-                    <a className="link" href={`https://sketchfab.com/3d-models/${demande.base.uid}`} target="_blank" rel="noreferrer">
-                      le modèle de base
-                    </a>
-                  </>
+                <h4>Badges repérés par Claude</h4>
+                <ul className="admin-list">
+                  {badges.map((b, i) => (
+                    <li key={i}>
+                      <b>{b.detail}</b> : {b.ou}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <p className="notice">
+              Claude prépare l&apos;image dans le chat du projet : les badges en relief, aux bonnes couleurs (chromé en gris clair mat), séparés sur fond
+              blanc. Les logos de marque ne sont pas copiés tels quels : un monogramme les remplace. Dépose l&apos;image ici.
+            </p>
+            {fichiers.logos && (
+              <a href={photoSrc(fichiers.logos)} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="meshy-thumb" src={photoSrc(fichiers.logos)} alt="Image des logos" />
+              </a>
+            )}
+            <div className="admin-actions">
+              <label className={`cta ghost ${busy ? "off" : ""}`}>
+                {busy === "logos" ? "Envoi…" : fichiers.logos ? "Remplacer l'image" : "Déposer l'image des logos"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "logos")} />
+              </label>
+            </div>
+          </>
+        )}
+
+        {sel === "meshy_logos" && (
+          <>
+            <div className="meshy-io">
+              <div className="meshy-col">
+                <h4>{meshyLogos ? "Envoyé à Meshy" : "Sera envoyé à Meshy"}</h4>
+                {fichiers.logos ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="meshy-thumb" src={photoSrc(meshyLogos?.inputs?.[0] ?? fichiers.logos)} alt="Image des logos" />
+                ) : (
+                  <p className="notice">Il faut d&apos;abord l&apos;image des logos (bloc Logos).</p>
                 )}
-                , envoie-{demande.base?.uid ? "les" : "le"} dans le chat, puis coche « C&apos;est fait » quand le rendu est prêt.
+                <p className="sub">Image vers 3D, une seule image, texture {meshyLogos?.texture ? "oui" : "non (on peint nous-mêmes)"}.</p>
+              </div>
+              <span className="meshy-arrow" aria-hidden>→</span>
+              <div className="meshy-col">
+                <h4>Logos en 3D</h4>
+                {meshyLogos?.glb ? (
+                  <>
+                    <GlbViewer src={photoSrc(meshyLogos.glb)} />
+                    <p className="sub">
+                      <a className="link" href={photoSrc(meshyLogos.glb)} download={`logos-${id}.glb`}>Télécharger le .glb</a>
+                    </p>
+                  </>
+                ) : (
+                  <div className="glb-viewer">
+                    <span>
+                      {!meshyLogos
+                        ? "Pas encore lancé."
+                        : step.state === "error"
+                          ? `Échec : ${meshyLogos.error ?? meshyLogos.status}`
+                          : `Meshy travaille… ${meshyLogos.progress ?? 0} %`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="admin-actions">
+              <button
+                className="cta ghost"
+                disabled={Boolean(busy) || Boolean(meshyLogos) || !fichiers.logos}
+                onClick={() => call("meshy_logos", "/api/meshy", { id, kind: "logos" }, "Lancer une génération Meshy payante pour l'image des logos ?")}
+              >
+                {meshyLogos ? "Génération lancée" : busy === "meshy_logos" ? "Lancement…" : "Générer les logos en 3D (Meshy)"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {sel === "assemblage" && (
+          <>
+            <p className="notice">
+              <b>L&apos;assemblage se fait dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Envoie à Claude les fichiers ci-dessous : il pose les
+              logos, met les couleurs, passe les vitres en noir teinté pour qu&apos;on ne voie pas l&apos;intérieur, et te rend la miniature en .glb.
+            </p>
+            <ul className="admin-list">
+              <li>
+                Voiture :{" "}
+                {meshy?.glb ? (
+                  <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>modèle Meshy</a>
+                ) : (
+                  "pas encore de modèle Meshy (bloc Pièces 3D)"
+                )}
+              </li>
+              <li>
+                Logos :{" "}
+                {meshyLogos?.glb ? (
+                  <a className="link" href={photoSrc(meshyLogos.glb)} download={`logos-${id}.glb`}>logos Meshy</a>
+                ) : (
+                  "pas encore générés (bloc Logos en 3D)"
+                )}
+              </li>
+              {x && <li>Liste des détails : bloc Détails manquants</li>}
+            </ul>
+            {fichiers.final ? (
+              <>
+                <h4>Miniature terminée</h4>
+                <GlbViewer src={photoSrc(fichiers.final)} colors />
+                <p className="sub">
+                  Regarde-la sous tous les angles avant de l&apos;envoyer au client.{" "}
+                  <a className="link" href={photoSrc(fichiers.final)} download={`miniature-${id}.glb`}>Télécharger</a>
+                </p>
               </>
             ) : (
-              "Il faut d'abord le modèle Meshy (bloc Pièces 3D)."
+              suivi.assemblage && <p className="node-ok">Coché comme fait le {day(suivi.assemblage)}</p>
             )}
-          </div>
+            <div className="admin-actions">
+              <label className={`cta ${busy ? "off" : ""}`}>
+                {busy === "final" ? "Envoi…" : fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)"}
+                <input type="file" accept=".glb,model/gltf-binary" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "final")} />
+              </label>
+            </div>
+          </>
         )}
 
         {def.manual && (

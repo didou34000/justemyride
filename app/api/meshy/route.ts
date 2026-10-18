@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin, meshyConfigured, refreshJob, startJob, usage } from "@/lib/meshy";
+import { isAdmin, isMeshyKind, meshyConfigured, refreshJob, startJob, usage } from "@/lib/meshy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,30 +12,34 @@ function guard(request: Request) {
   return null;
 }
 
-/** Réservé au propriétaire : lance la génération 3D d'une demande client. Body : { id }. */
+/** Réservé au propriétaire : lance la génération 3D d'une demande client. Body : { id, kind? } (car par défaut, ou logos). */
 export async function POST(request: Request) {
   const refused = guard(request);
   if (refused) return refused;
-  const { id } = await request.json().catch(() => ({}));
+  const { id, kind = "car" } = await request.json().catch(() => ({}));
   if (!validId(id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
+  if (!isMeshyKind(kind)) return NextResponse.json({ error: "Type invalide" }, { status: 400 });
   try {
-    return NextResponse.json({ job: await startJob(id), usage: await usage() });
+    return NextResponse.json({ job: await startJob(id, kind), usage: await usage() });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 409 });
   }
 }
 
-/** ?id=… : état de la génération (et copie du GLB une fois prête). Sans id : compteur du mois. */
+/** ?id=…&kind=… : état de la génération (et copie du GLB une fois prête). Sans id : compteur du mois. */
 export async function GET(request: Request) {
   const refused = guard(request);
   if (refused) return refused;
-  const id = new URL(request.url).searchParams.get("id");
+  const params = new URL(request.url).searchParams;
+  const id = params.get("id");
+  const kind = params.get("kind") ?? "car";
   const u = await usage();
   const { raw: _raw, ...counts } = u;
   if (!id) return NextResponse.json({ usage: counts });
   if (!validId(id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
+  if (!isMeshyKind(kind)) return NextResponse.json({ error: "Type invalide" }, { status: 400 });
   try {
-    return NextResponse.json({ job: await refreshJob(id), usage: counts });
+    return NextResponse.json({ job: await refreshJob(id, kind), usage: counts });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }

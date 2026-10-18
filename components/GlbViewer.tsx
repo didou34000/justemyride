@@ -6,8 +6,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
-/** Visionneuse simple d'un GLB (rendu Meshy) : on tourne autour à la souris ou au doigt. */
-export default function GlbViewer({ src }: { src: string }) {
+/**
+ * Visionneuse simple d'un GLB : on tourne autour à la souris ou au doigt.
+ * colors : garder les matériaux du fichier (miniature peinte) au lieu de griser un rendu Meshy sans texture.
+ */
+export default function GlbViewer({ src, colors = false }: { src: string; colors?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
 
@@ -38,7 +41,7 @@ export default function GlbViewer({ src }: { src: string }) {
         // Sans texture, Meshy livre un modèle tout blanc : une teinte grise fait ressortir les volumes.
         model.traverse((o) => {
           const m = o as THREE.Mesh;
-          if (m.isMesh && !(m.material as THREE.MeshStandardMaterial).map)
+          if (!colors && m.isMesh && !(m.material as THREE.MeshStandardMaterial).map)
             m.material = new THREE.MeshStandardMaterial({ color: 0xb9b4ab, roughness: 0.55, metalness: 0.1 });
         });
         const b = new THREE.Box3().setFromObject(model);
@@ -77,7 +80,7 @@ export default function GlbViewer({ src }: { src: string }) {
       renderer.dispose();
       el.removeChild(renderer.domElement);
     };
-  }, [src]);
+  }, [src, colors]);
 
   return (
     <div ref={box} className="glb-viewer">
