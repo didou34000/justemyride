@@ -1,5 +1,6 @@
 import { get, put } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
+export { isAdmin } from "@/lib/adminAuth";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 
 /**
@@ -25,14 +26,6 @@ export function meshyConfigured() {
   return Boolean(process.env.MESHY_API_KEY && process.env.ADMIN_TOKEN && storageEnabled());
 }
 
-export function isAdmin(request: Request) {
-  const expected = process.env.ADMIN_TOKEN;
-  const given = request.headers.get("x-admin-token") ?? "";
-  if (!expected || given.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
-  return diff === 0;
-}
 
 type Usage = { days: Record<string, number>; total: number };
 const usagePath = (d: Date) => `meshy/usage-${d.toISOString().slice(0, 7)}.json`;
