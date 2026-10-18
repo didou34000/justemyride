@@ -22,7 +22,7 @@ export type CarModel = { id: string; name: string; generations: Generation[] };
 export type Brand = {
   id: string;
   name: string;
-  /** Monogramme affiché sur la tuile (pas de logo officiel : marques déposées). */
+  /** Initiales affichées si le logo manque. */
   mark: string;
   models: CarModel[];
 };
@@ -118,6 +118,23 @@ export const brands: Brand[] = [
     ["ford", "Ford", "F"],
   ].map(([id, name, mark]) => ({ id, name, mark, models: [] })),
 ];
+
+/**
+ * Logo officiel de la marque, affiché seulement pour que le client reconnaisse sa marque
+ * (sélecteur et garage). Jamais sur les rendus des miniatures ni dans la publicité :
+ * voir juridique-logos-et-formes.md. Fichiers dans public/brands/.
+ */
+const LOGOS = new Set(["mini", "bmw", "volkswagen", "renault", "peugeot", "audi", "mercedes", "porsche", "toyota", "honda", "subaru", "nissan", "citroen", "ford"]);
+
+export function brandLogo(nameOrId: string): string | undefined {
+  const id = nameOrId
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+  const key = id === "vw" ? "volkswagen" : id.startsWith("mercedes") ? "mercedes" : id;
+  return LOGOS.has(key) ? `/brands/${key}.png` : undefined;
+}
 
 /** Ce que le client a choisi comme base, envoyé avec ses photos. */
 export type Base = {

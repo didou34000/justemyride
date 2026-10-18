@@ -1,33 +1,42 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import Uploader from "@/components/Uploader";
-import HeroReveal from "@/components/HeroReveal";
-import { Faq, Finishes, HowItWorks, Sizes, TrustBar } from "@/components/HomeSections";
+import HeroCollector from "@/components/HeroCollector";
+import BrandGrid from "@/components/BrandGrid";
+import StickyCta from "@/components/StickyCta";
+import { BeforeAfter, Faq, Finishes, HowItWorks, Sizes, TrustBar } from "@/components/HomeSections";
 import { cars } from "@/lib/cars";
 import { sizes } from "@/lib/options";
 
 const from = Math.min(...sizes.map((s) => s.price));
 const example = cars.find((c) => c.available && c.glb)!;
+const heroScale = sizes.find((s) => s.id === "1-24") ?? sizes[0];
 
 export default function Home() {
   return (
     <main>
-      <Nav link={{ href: "/configurer", label: "Le garage" }} />
+      <Nav link={{ href: "#deposer", label: "Envoyer ma voiture" }} />
 
-      <HeroReveal car={example} from={from} />
+      <HeroCollector car={example} from={from} scale={heroScale} />
       <TrustBar />
+      <BrandGrid />
+      <BeforeAfter />
       <HowItWorks />
       <Sizes />
       <Finishes />
 
       <section className="start" id="deposer">
-        <h2>Ta voiture, 8 photos, on s'occupe du reste.</h2>
+        <p className="eyebrow">C'est parti</p>
+        <h2>
+          Ta voiture, 8 photos, <i>on s'occupe du reste.</i>
+        </h2>
         <Uploader />
       </section>
 
       <Faq />
 
       <Footer />
+      <StickyCta from={from} />
     </main>
   );
 }
