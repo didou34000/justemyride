@@ -32,7 +32,7 @@ const day = (iso?: string) =>
 /** Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi. */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, analyse, meshy, details, meshyLogos, fichiers, suivi, steps } = order;
+  const { id, demande, analyse, meshy, details, meshyLogos, fichiers, badges: lib, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "photos";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -43,8 +43,7 @@ export default function AdminDemande({ order }: { order: Order }) {
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
   const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
   const detailsBusy = Boolean(steps.find((s) => s.key === "details")?.busy);
-  const logosRunning = Boolean(steps.find((s) => s.key === "meshy_logos")?.busy);
-  const running = analyseBusy || meshyRunning || detailsBusy || logosRunning;
+  const running = analyseBusy || meshyRunning || detailsBusy;
   const x = details?.result;
   const badges = x?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
 
@@ -148,7 +147,7 @@ export default function AdminDemande({ order }: { order: Order }) {
         </div>
         <LiveRefresh
           every={running ? 8 : 30}
-          poll={meshyRunning ? `/api/meshy?id=${id}` : logosRunning ? `/api/meshy?id=${id}&kind=logos` : undefined}
+          poll={meshyRunning ? `/api/meshy?id=${id}` : undefined}
         />
       </div>
 
@@ -392,10 +391,33 @@ export default function AdminDemande({ order }: { order: Order }) {
                 </ul>
               </>
             )}
-            <p className="notice">
-              Claude prépare l&apos;image dans le chat du projet : les badges en relief, aux bonnes couleurs (chromé en gris clair mat), séparés sur fond
-              blanc. Les logos de marque ne sont pas copiés tels quels : un monogramme les remplace. Dépose l&apos;image ici.
-            </p>
+            {lib && !fichiers.logos ? (
+              <>
+                <p className="notice">
+                  <b>Ajoutés tout seuls depuis la bibliothèque :</b> {lib.label}. Faits par Claude dans Blender, aux bonnes couleurs (chromé en gris
+                  clair mat). Les logos de marque ne sont pas copiés : le monogramme JM les remplace. Claude les pose à l&apos;assemblage, autant de fois
+                  que nécessaire (ex. le « S » de calandre et celui des clignotants).
+                </p>
+                <div className="meshy-io">
+                  <div className="meshy-col">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="meshy-thumb" src={photoSrc(lib.image)} alt="Badges" />
+                  </div>
+                  <span className="meshy-arrow" aria-hidden>→</span>
+                  <div className="meshy-col">
+                    <GlbViewer src={lib.glb} colors />
+                    <p className="sub">
+                      <a className="link" href={lib.glb} download>Télécharger les badges (.glb)</a>
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="notice">
+                Pas de badges en bibliothèque pour cette voiture : Claude prépare l&apos;image dans le chat du projet (badges en relief, bonnes couleurs,
+                sans copier les logos de marque). Dépose-la ici.
+              </p>
+            )}
             {fichiers.logos && (
               <a href={photoSrc(fichiers.logos)} target="_blank" rel="noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -404,57 +426,9 @@ export default function AdminDemande({ order }: { order: Order }) {
             )}
             <div className="admin-actions">
               <label className={`cta ghost ${busy ? "off" : ""}`}>
-                {busy === "logos" ? "Envoi…" : fichiers.logos ? "Remplacer l'image" : "Déposer l'image des logos"}
+                {busy === "logos" ? "Envoi…" : fichiers.logos || lib ? "Remplacer par une autre image" : "Déposer l'image des logos"}
                 <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "logos")} />
               </label>
-            </div>
-          </>
-        )}
-
-        {sel === "meshy_logos" && (
-          <>
-            <div className="meshy-io">
-              <div className="meshy-col">
-                <h4>{meshyLogos ? "Envoyé à Meshy" : "Sera envoyé à Meshy"}</h4>
-                {fichiers.logos ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="meshy-thumb" src={photoSrc(meshyLogos?.inputs?.[0] ?? fichiers.logos)} alt="Image des logos" />
-                ) : (
-                  <p className="notice">Il faut d&apos;abord l&apos;image des logos (bloc Logos).</p>
-                )}
-                <p className="sub">Image vers 3D, une seule image, texture {meshyLogos?.texture ? "oui" : "non (on peint nous-mêmes)"}.</p>
-              </div>
-              <span className="meshy-arrow" aria-hidden>→</span>
-              <div className="meshy-col">
-                <h4>Logos en 3D</h4>
-                {meshyLogos?.glb ? (
-                  <>
-                    <GlbViewer src={photoSrc(meshyLogos.glb)} />
-                    <p className="sub">
-                      <a className="link" href={photoSrc(meshyLogos.glb)} download={`logos-${id}.glb`}>Télécharger le .glb</a>
-                    </p>
-                  </>
-                ) : (
-                  <div className="glb-viewer">
-                    <span>
-                      {!meshyLogos
-                        ? "Pas encore lancé."
-                        : step.state === "error"
-                          ? `Échec : ${meshyLogos.error ?? meshyLogos.status}`
-                          : `Meshy travaille… ${meshyLogos.progress ?? 0} %`}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="admin-actions">
-              <button
-                className="cta ghost"
-                disabled={Boolean(busy) || Boolean(meshyLogos) || !fichiers.logos}
-                onClick={() => call("meshy_logos", "/api/meshy", { id, kind: "logos" }, "Lancer une génération Meshy payante pour l'image des logos ?")}
-              >
-                {meshyLogos ? "Génération lancée" : busy === "meshy_logos" ? "Lancement…" : "Générer les logos en 3D (Meshy)"}
-              </button>
             </div>
           </>
         )}
@@ -475,11 +449,15 @@ export default function AdminDemande({ order }: { order: Order }) {
                 )}
               </li>
               <li>
-                Logos :{" "}
-                {meshyLogos?.glb ? (
+                Badges :{" "}
+                {lib ? (
+                  <a className="link" href={lib.glb} download>badges 3D de la bibliothèque</a>
+                ) : meshyLogos?.glb ? (
                   <a className="link" href={photoSrc(meshyLogos.glb)} download={`logos-${id}.glb`}>logos Meshy</a>
+                ) : fichiers.logos ? (
+                  <a className="link" href={photoSrc(fichiers.logos)} target="_blank" rel="noreferrer">image des logos</a>
                 ) : (
-                  "pas encore générés (bloc Logos en 3D)"
+                  "pas encore faits (bloc Logos)"
                 )}
               </li>
               {x && <li>Liste des détails : bloc Détails manquants</li>}
