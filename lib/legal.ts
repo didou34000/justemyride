@@ -12,10 +12,10 @@ export const SELLER = {
   address: "163 allée François-Xavier Fabre, 34980 Montferrier-sur-Lez, France",
   email: "dorian.vuattoux@gmail.com",
   /** Obligatoire dans les mentions légales (LCEN) : à renseigner. Vide = ligne masquée. */
-  phone: "",
+  phone: "+33 7 67 37 70 14",
   /** Médiateur de la consommation (obligatoire pour vendre aux particuliers) : nom et site, à renseigner. */
   mediator: null as null | { name: string; url: string },
-  /** Franchise en base de TVA (art. 293 B du CGI) : à confirmer selon ta situation. */
+  /** Franchise en base de TVA (art. 293 B du CGI) : confirmé le 18 octobre 2026. */
   vatFranchise: true,
   site: "https://justemyride.vercel.app",
   updated: "18 octobre 2026",
