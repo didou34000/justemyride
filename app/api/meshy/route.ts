@@ -12,15 +12,15 @@ function guard(request: Request) {
   return null;
 }
 
-/** Réservé au propriétaire : lance la génération 3D d'une demande client. Body : { id, kind? } (car par défaut, ou logos). */
+/** Réservé au propriétaire : lance la génération 3D d'une demande client. Body : { id, kind?, split? } (car par défaut ; split : découper la voiture en pièces dès qu'elle est prête). */
 export async function POST(request: Request) {
   const refused = guard(request);
   if (refused) return refused;
-  const { id, kind = "car" } = await request.json().catch(() => ({}));
+  const { id, kind = "car", split = false } = await request.json().catch(() => ({}));
   if (!validId(id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   if (!isMeshyKind(kind)) return NextResponse.json({ error: "Type invalide" }, { status: 400 });
   try {
-    return NextResponse.json({ job: await startJob(id, kind), usage: await usage() });
+    return NextResponse.json({ job: await startJob(id, kind, { split: split === true }), usage: await usage() });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 409 });
   }

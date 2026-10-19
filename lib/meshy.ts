@@ -67,6 +67,10 @@ export type Job = {
   error?: string;
   /** Découpe : nombre de pièces obtenues. */
   parts?: number;
+  /** Voiture : lancer la découpe en pièces dès que le modèle est prêt. */
+  autoSplit?: boolean;
+  /** Voiture : pourquoi la découpe automatique n'a pas pu partir. */
+  splitError?: string;
   startedAt: string;
 };
 
@@ -94,7 +98,7 @@ async function asDataUri(pathname: string) {
 }
 
 /** Lance une génération pour une demande client, si tous les garde-fous passent. */
-export async function startJob(id: string, kind: MeshyKind = "car"): Promise<Job> {
+export async function startJob(id: string, kind: MeshyKind = "car", opts: { split?: boolean } = {}): Promise<Job> {
   if (await readJob(id, kind)) throw new Error("Une génération existe déjà pour cette demande");
 
   const now = new Date();
@@ -122,6 +126,7 @@ export async function startJob(id: string, kind: MeshyKind = "car"): Promise<Job
   // Réservation avant l'appel : un double clic ne lance pas deux générations payantes.
   const texture = process.env.MESHY_TEXTURE === "1";
   const job: Job = { status: "starting", startedAt: now.toISOString(), inputs: photos, texture };
+  if (kind === "car" && opts.split) job.autoSplit = true;
   await writeJson(jobPath(id, kind), job);
 
   try {
@@ -201,5 +206,14 @@ export async function refreshJob(id: string, kind: MeshyKind = "car"): Promise<J
     job.glb = saved.pathname;
   }
   await writeJson(jobPath(id, kind), job);
+  // Découpe demandée dès le départ : elle part toute seule une fois la voiture prête.
+  if (kind === "car" && job.glb && job.autoSplit && !(await readJob(id, "split"))) {
+    try {
+      await startJob(id, "split");
+    } catch (e) {
+      job.splitError = (e as Error).message;
+      await writeJson(jobPath(id, kind), job);
+    }
+  }
   return job;
 }
