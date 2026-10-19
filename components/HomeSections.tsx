@@ -47,8 +47,8 @@ export function Hero() {
       <div className="hero-copy">
         <h1>La miniature de ta voiture.</h1>
         <p className="lead">
-          Pas un modèle de catalogue : ta voiture, avec ses jantes, sa couleur et ses modifs. Envoie 2 photos, valide
-          l'aperçu 3D, on la fabrique en pièce unique.
+          Pas un modèle de catalogue : ta voiture, avec ses jantes, sa couleur et ses modifs. Envoie tes photos,
+          valide l'aperçu 3D, on la fabrique en pièce unique.
         </p>
         <div className="hero-actions">
           <Link href="/envoyer" className="cta">
@@ -89,8 +89,8 @@ export function HowItWorks() {
     {
       img: "/guide/avant-gauche.jpg",
       alt: "Exemple de photo d'une voiture prise de trois quarts avant",
-      t: "Tu envoies 2 photos",
-      d: "Un trois quarts avant et un trois quarts arrière, au téléphone. Tu peux en ajouter jusqu'à 6 pour plus de précision.",
+      t: "Tu envoies tes photos",
+      d: "Au minimum un trois quarts avant et un trois quarts arrière, au téléphone. Ajoute-en autant que tu veux : plus il y en a, plus elle est fidèle.",
     },
     {
       img: "/cars/bmw-m140i.jpg",
@@ -222,11 +222,10 @@ export function Trust() {
 export function Faq() {
   const qa: [string, React.ReactNode][] = [
     [
-      "Pourquoi 2 photos seulement ?",
+      "Combien de photos faut-il ?",
       <>
-        Un trois quarts avant et un trois quarts arrière suffisent pour retrouver la forme de ta voiture. Si elle est
-        modifiée (kit, aileron, jantes spéciales), ajoute des photos de profil ou des gros plans : plus on en a, plus la
-        miniature est fidèle.
+        Au minimum 2 : un trois quarts avant et un trois quarts arrière. Il n'y a pas de maximum : profil, face, arrière,
+        jantes, gros plans des modifs (kit, aileron, autocollants)… Plus on en a, plus la miniature est fidèle.
       </>,
     ],
     [
@@ -295,7 +294,7 @@ export function FinalCta() {
   return (
     <section className="final">
       <h2>Ta voiture mérite sa miniature.</h2>
-      <p>2 photos, quelques minutes, et on s'occupe du reste.</p>
+      <p>Quelques photos, quelques minutes, et on s'occupe du reste.</p>
       <Link href="/envoyer" className="cta">
         Envoyer mes photos
       </Link>

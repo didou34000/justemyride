@@ -13,7 +13,7 @@ const example = cars.find((c) => c.available && c.glb)!;
 
 export const metadata = pageMeta({
   title: `Miniature personnalisée de ta voiture, d'après tes photos · ${SITE_NAME}`,
-  description: `Envoie 2 photos de ta voiture : on la recrée en 3D, tu la personnalises, puis on fabrique sa miniature en pièce unique. En 1:43, 1:24 ou 1:18, dès ${from} €.`,
+  description: `Envoie des photos de ta voiture : on la recrée en 3D, tu la personnalises, puis on fabrique sa miniature en pièce unique. En 1:43, 1:24 ou 1:18, dès ${from} €.`,
   path: "/",
 });
 

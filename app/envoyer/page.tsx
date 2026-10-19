@@ -5,9 +5,9 @@ import { LEAD_TIME } from "@/lib/legal";
 import { pageMeta } from "@/lib/site";
 
 export const metadata = pageMeta({
-  title: "Envoie ta voiture : 2 photos suffisent",
+  title: "Envoie les photos de ta voiture",
   description:
-    "Choisis ton modèle, envoie 2 photos de ta voiture et reçois ton aperçu 3D gratuit par e-mail. Sans engagement : tu ne paies que si tu commandes ta miniature.",
+    "Choisis ton modèle, envoie les photos de ta voiture (2 au minimum) et reçois ton aperçu 3D gratuit par e-mail. Sans engagement : tu ne paies que si tu commandes ta miniature.",
   path: "/envoyer",
 });
 

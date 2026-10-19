@@ -133,7 +133,7 @@ export default async function CarPage({ params }: { params: Promise<{ slug: stri
         </dl>
         <p className="hint">
           Ta voiture est modifiée ou ce n'est pas exactement ce modèle ?{" "}
-          <Link href="/envoyer" className="link">Envoie-nous 2 photos</Link>, on la recrée telle qu'elle est.
+          <Link href="/envoyer" className="link">Envoie-nous tes photos</Link>, on la recrée telle qu'elle est.
         </p>
       </section>
       <Footer />

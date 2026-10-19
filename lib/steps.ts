@@ -32,7 +32,7 @@ export const MESHY_VIEWS = ["avant", "gauche", "arriere", "droite"];
 
 /**
  * Photos à donner à Meshy : les 4 faces si elles existent (anciennes demandes à 8 angles), sinon les 3/4 avant
- * et arrière (les 2 photos obligatoires depuis octobre 2026) puis les photos en plus. Jamais les gros plans.
+ * et arrière (les 2 photos obligatoires depuis octobre 2026) puis les autres photos. Jamais les gros plans.
  */
 export function meshyPhotos(files: { slot: string; pathname: string }[]): string[] {
   const order = [...MESHY_VIEWS, "avant-gauche", "arriere-droite", "arriere-gauche", "avant-droite"];

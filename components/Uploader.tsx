@@ -7,14 +7,16 @@ import type { Base } from "@/lib/catalog";
 import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
 
 /*
- * Envoi d'une voiture en 3 étapes : la voiture, les photos (2 obligatoires, 6 en plus au choix), le contact.
+ * Envoi d'une voiture en 3 étapes : la voiture, les photos (2 obligatoires, puis autant qu'on veut), le contact.
  * Les noms des fichiers (« avant-gauche », « arriere-droite », « photo-N ») sont lus par l'admin, l'analyse et Meshy.
  */
 const REQUIRED = [
   { id: "avant-gauche", label: "3/4 avant", tip: "À l'angle avant, en diagonale : la face avant et tout un côté." },
   { id: "arriere-droite", label: "3/4 arrière", tip: "À l'angle arrière opposé : la face arrière et l'autre côté." },
 ] as const;
-const MAX_EXTRA = 6;
+// Pas de vraie limite pour le client : seulement un garde-fou contre un envoi par erreur de toute une galerie.
+const MAX_EXTRA = 78;
+const PARALLEL = 4;
 
 type ReqId = (typeof REQUIRED)[number]["id"];
 type Step = "car" | "photos" | "contact";
@@ -97,8 +99,12 @@ export default function Uploader() {
 
       const totalBytes = files.reduce((s, f) => s + f.file.size, 0);
       const loaded: Record<string, number> = {};
-      const uploaded = await Promise.all(
-        files.map(async ({ slot, file }) => {
+      // Envoi par lots de PARALLEL photos : un client peut en mettre des dizaines.
+      const uploaded: { slot: string; url: string; pathname: string }[] = [];
+      let next = 0;
+      async function worker() {
+        while (next < files.length) {
+          const { slot, file } = files[next++];
           const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
           // Connexion Blob actuelle (OIDC) : envoi par URL présignée, en une seule requête.
           const put = mode === "oidc" ? uploadPresigned : upload;
@@ -112,9 +118,10 @@ export default function Uploader() {
               setProgress(Math.min(99, Math.round((sum / totalBytes) * 100)));
             },
           });
-          return { slot, url: blob.url, pathname: blob.pathname };
-        })
-      );
+          uploaded.push({ slot, url: blob.url, pathname: blob.pathname });
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(PARALLEL, files.length) }, worker));
 
       const res = await fetch("/api/submit", {
         method: "POST",
@@ -201,9 +208,9 @@ export default function Uploader() {
               Changer
             </button>
           </div>
-          <h2 className="wz-title">2 photos de ta voiture</h2>
+          <h2 className="wz-title">Les photos de ta voiture</h2>
           <p className="wz-tip">
-            Voiture entière dans le cadre, de jour si possible. Sur ordinateur, tu peux glisser toutes tes photos d'un coup.
+            Au minimum un 3/4 avant et un 3/4 arrière, puis autant de photos que tu veux : plus il y en a, plus ta miniature est fidèle. Sur ordinateur, glisse-les toutes d'un coup.
           </p>
 
           <div className="req-grid">
@@ -236,8 +243,8 @@ export default function Uploader() {
 
           <div className="extra">
             <div className="extra-head">
-              <b>Pour plus de précision</b>
-              <span>Facultatif, jusqu'à {MAX_EXTRA} : profil, face, arrière, jantes, détails modifiés…</span>
+              <b>Toutes les autres photos{extra.length ? ` (${extra.length})` : ""}</b>
+              <span>Profil, face, arrière, jantes, intérieur, détails modifiés… Mets-en autant que tu veux.</span>
             </div>
             <div className="extra-grid">
               {extra.map((f, i) => (
@@ -267,7 +274,7 @@ export default function Uploader() {
           </div>
 
           <button className="cta full" disabled={!reqDone} onClick={() => setStep("contact")}>
-            {reqDone ? `Continuer avec ${total} photo${total > 1 ? "s" : ""}` : "Ajoute les 2 photos pour continuer"}
+            {reqDone ? `Continuer avec ${total} photo${total > 1 ? "s" : ""}` : "Ajoute au moins le 3/4 avant et le 3/4 arrière"}
           </button>
         </div>
       )}
