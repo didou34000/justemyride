@@ -308,14 +308,62 @@ export default function AdminDemande({ order }: { order: Order }) {
               </div>
             </div>
 
+            <h4>Découpe en pièces</h4>
+            <p className="sub">
+              Meshy découpe la voiture selon les couleurs des photos (carrosserie, toit, vitres, phares, calandre, jantes, pneus, feux, plaques, plastiques
+              noirs). Chaque pièce reçoit ensuite sa couleur exacte, au lieu de zones devinées à l&apos;œil.
+            </p>
+            {meshySplit?.glb ? (
+              <GlbViewer src={photoSrc(meshySplit.glb)} colors />
+            ) : meshySplit ? (
+              <div className="glb-viewer">
+                <span>
+                  {splitFailed
+                    ? `Échec : ${meshySplit.error ?? meshySplit.status}`
+                    : meshySplit.status === "PENDING" || meshySplit.status === "starting"
+                      ? "En file d'attente chez Meshy…"
+                      : `Meshy découpe… ${meshySplit.progress ?? 0} %`}
+                  {!splitFailed && meshySplit.error ? ` (${meshySplit.error})` : ""}
+                </span>
+              </div>
+            ) : null}
+            {meshy?.autoSplit && !meshySplit && meshy.splitError && <p className="notice err">Découpe automatique impossible : {meshy.splitError}</p>}
+            {meshy?.autoSplit && !meshySplit && !meshy.splitError && <p className="sub">La découpe partira toute seule dès que le modèle sera prêt.</p>}
+
             <div className="admin-actions">
-              <button
-                className="cta ghost"
-                disabled={Boolean(busy) || Boolean(meshy)}
-                onClick={() => call("meshy", "/api/meshy", { id }, "Lancer une génération Meshy payante à partir des 4 faces de la voiture ?")}
-              >
-                {meshy ? "Génération lancée" : busy === "meshy" ? "Lancement…" : "Générer en 3D (Meshy)"}
-              </button>
+              {!meshy ? (
+                <>
+                  <button
+                    className="cta"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                      call(
+                        "meshy",
+                        "/api/meshy",
+                        { id, split: true },
+                        "Générer la voiture en 3D puis la découper en pièces ? (payant : génération Meshy + 10 crédits pour la découpe)",
+                      )
+                    }
+                  >
+                    {busy === "meshy" ? "Lancement…" : "Générer et découper en pièces"}
+                  </button>
+                  <button
+                    className="cta ghost"
+                    disabled={Boolean(busy)}
+                    onClick={() => call("meshy", "/api/meshy", { id }, "Lancer une génération Meshy payante à partir des 4 faces de la voiture ?")}
+                  >
+                    Générer d&apos;un bloc
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="cta ghost"
+                  disabled={Boolean(busy) || !meshy.glb || Boolean(meshySplit) || Boolean(meshy.autoSplit && !meshy.splitError)}
+                  onClick={() => call("split", "/api/meshy", { id, kind: "split" }, "Découper le modèle Meshy en pièces ? (payant : 10 crédits Meshy)")}
+                >
+                  {meshySplit ? "Découpe lancée" : busy === "split" ? "Lancement…" : "Découper en pièces (Meshy, 10 crédits)"}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -472,18 +520,6 @@ export default function AdminDemande({ order }: { order: Order }) {
               )}
               {x && <li>Liste des détails : bloc Détails manquants</li>}
             </ul>
-            <h4>Découpe en pièces</h4>
-            <p className="sub">
-              Meshy découpe la voiture selon les couleurs des photos (carrosserie, toit, vitres, phares, calandre, jantes, pneus, feux, plaques, plastiques
-              noirs). Chaque pièce reçoit ensuite sa couleur exacte, au lieu de zones devinées à l&apos;œil.
-            </p>
-            {meshySplit?.glb ? (
-              <GlbViewer src={photoSrc(meshySplit.glb)} colors />
-            ) : meshySplit ? (
-              <div className="glb-viewer">
-                <span>{splitFailed ? `Échec : ${meshySplit.error ?? meshySplit.status}` : `Meshy découpe… ${meshySplit.progress ?? 0} %`}</span>
-              </div>
-            ) : null}
             {fichiers.final ? (
               <>
                 <h4>Miniature terminée</h4>
@@ -495,13 +531,6 @@ export default function AdminDemande({ order }: { order: Order }) {
               </>
             ) : null}
             <div className="admin-actions">
-              <button
-                className="cta ghost"
-                disabled={Boolean(busy) || !meshy?.glb || Boolean(meshySplit)}
-                onClick={() => call("split", "/api/meshy", { id, kind: "split" }, "Découper le modèle Meshy en pièces ? (payant : 10 crédits Meshy)")}
-              >
-                {meshySplit ? "Découpe lancée" : busy === "split" ? "Lancement…" : "Découper en pièces (Meshy, 10 crédits)"}
-              </button>
               <label className={`cta ${busy ? "off" : ""}`}>
                 {busy === "final" ? "Envoi…" : fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)"}
                 <input type="file" accept=".glb,model/gltf-binary" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "final")} />
