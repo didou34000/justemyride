@@ -32,7 +32,7 @@ const day = (iso?: string) =>
 /** Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi. */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, analyse, meshy, details, meshyLogos, fichiers, badges: lib, suivi, steps } = order;
+  const { id, demande, analyse, meshy, details, meshyLogos, meshySplit, fichiers, badges: lib, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "photos";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -41,9 +41,11 @@ export default function AdminDemande({ order }: { order: Order }) {
   const step = steps.find((s) => s.key === sel)!;
   const def = STEPS.find((s) => s.key === sel)!;
   const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
+  const splitRunning = Boolean(meshySplit && !meshySplit.glb && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshySplit.status));
+  const splitFailed = Boolean(meshySplit && ["FAILED", "CANCELED", "error"].includes(meshySplit.status));
   const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
   const detailsBusy = Boolean(steps.find((s) => s.key === "details")?.busy);
-  const running = analyseBusy || meshyRunning || detailsBusy;
+  const running = analyseBusy || meshyRunning || detailsBusy || splitRunning;
   const x = details?.result;
   const badges = x?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
 
@@ -147,7 +149,7 @@ export default function AdminDemande({ order }: { order: Order }) {
         </div>
         <LiveRefresh
           every={running ? 8 : 30}
-          poll={meshyRunning ? `/api/meshy?id=${id}` : undefined}
+          poll={meshyRunning ? `/api/meshy?id=${id}` : splitRunning ? `/api/meshy?id=${id}&kind=split` : undefined}
         />
       </div>
 
@@ -460,8 +462,28 @@ export default function AdminDemande({ order }: { order: Order }) {
                   "pas encore faits (bloc Logos)"
                 )}
               </li>
+              {meshySplit?.glb && (
+                <li>
+                  Voiture découpée :{" "}
+                  <a className="link" href={photoSrc(meshySplit.glb)} download={`pieces-${id}.glb`}>
+                    {meshySplit.parts ? `${meshySplit.parts} pièces` : "modèle découpé"}
+                  </a>
+                </li>
+              )}
               {x && <li>Liste des détails : bloc Détails manquants</li>}
             </ul>
+            <h4>Découpe en pièces</h4>
+            <p className="sub">
+              Meshy découpe la voiture selon les couleurs des photos (carrosserie, toit, vitres, phares, calandre, jantes, pneus, feux, plaques, plastiques
+              noirs). Chaque pièce reçoit ensuite sa couleur exacte, au lieu de zones devinées à l&apos;œil.
+            </p>
+            {meshySplit?.glb ? (
+              <GlbViewer src={photoSrc(meshySplit.glb)} colors />
+            ) : meshySplit ? (
+              <div className="glb-viewer">
+                <span>{splitFailed ? `Échec : ${meshySplit.error ?? meshySplit.status}` : `Meshy découpe… ${meshySplit.progress ?? 0} %`}</span>
+              </div>
+            ) : null}
             {fichiers.final ? (
               <>
                 <h4>Miniature terminée</h4>
@@ -473,6 +495,13 @@ export default function AdminDemande({ order }: { order: Order }) {
               </>
             ) : null}
             <div className="admin-actions">
+              <button
+                className="cta ghost"
+                disabled={Boolean(busy) || !meshy?.glb || Boolean(meshySplit)}
+                onClick={() => call("split", "/api/meshy", { id, kind: "split" }, "Découper le modèle Meshy en pièces ? (payant : 10 crédits Meshy)")}
+              >
+                {meshySplit ? "Découpe lancée" : busy === "split" ? "Lancement…" : "Découper en pièces (Meshy, 10 crédits)"}
+              </button>
               <label className={`cta ${busy ? "off" : ""}`}>
                 {busy === "final" ? "Envoi…" : fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)"}
                 <input type="file" accept=".glb,model/gltf-binary" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "final")} />
