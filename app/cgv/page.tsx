@@ -52,8 +52,8 @@ export default function CGV() {
       <h2>4. Commande et paiement</h2>
       <p>
         Le client configure sa miniature puis valide sa commande sur la page de paiement sécurisée de Shopify. La commande
-        est ferme après paiement ; un e-mail de confirmation est envoyé. Le paiement se fait par carte bancaire, PayPal ou
-        Klarna et est débité à la commande.
+        est ferme après paiement ; un e-mail de confirmation est envoyé. Le paiement se fait par carte bancaire, PayPal, Klarna
+        ou Shop Pay, ainsi qu'Apple Pay sur les appareils Apple, et est débité à la commande.
       </p>
       <p>
         Lorsque la voiture n'existe pas encore dans le catalogue, le client envoie d'abord ses photos. Cet envoi est

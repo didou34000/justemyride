@@ -28,8 +28,8 @@ const PAY = [
   ["mastercard", "Mastercard"],
   ["paypal", "PayPal"],
   ["klarna", "Klarna"],
+  ["shoppay", "Shop Pay"],
   ["applepay", "Apple Pay"],
-  ["googlepay", "Google Pay"],
 ] as const;
 
 export function PayLogos({ small }: { small?: boolean }) {
@@ -192,7 +192,7 @@ export function Faq() {
     ],
     [
       "Comment je paie ?",
-      <>Sur la page de paiement sécurisée de Shopify : carte bancaire, PayPal, Klarna, Apple Pay ou Google Pay. Nous ne voyons jamais tes coordonnées bancaires.</>,
+      <>Sur la page de paiement sécurisée de Shopify : carte bancaire, PayPal, Klarna ou Shop Pay, et Apple Pay sur iPhone, iPad et Mac. Nous ne voyons jamais tes coordonnées bancaires.</>,
     ],
   ];
   return (
