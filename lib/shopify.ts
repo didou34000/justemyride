@@ -1,4 +1,4 @@
-import { caliperColors, exhausts, finishes, heights, rimStyles, tints, trims, wheelColors, type Config } from "./options";
+import { caliperColors, exhausts, finishes, heights, rimStyles, roofColors, stripeColors, tints, trims, wheelColors, type Config } from "./options";
 
 const label = (list: { id: string; label: string }[], id: string) =>
   id === "origine" ? "D'origine" : list.find((o) => o.id === id)?.label ?? id;
@@ -39,6 +39,8 @@ export async function createCheckout(c: Config): Promise<string> {
     { key: "Jantes", value: `${c.rimPart ?? label(rimStyles, c.rims)} / ${label(wheelColors, c.rimColor)}` },
     { key: "Échappement", value: c.exhaustPart ?? label(exhausts, c.exhaust) },
     { key: "Étriers", value: label(caliperColors, c.caliper) },
+    ...(c.roof && c.roof !== "origine" ? [{ key: "Toit", value: label(roofColors, c.roof) }] : []),
+    ...(c.stripes && c.stripes !== "origine" ? [{ key: "Bandes", value: label(stripeColors, c.stripes) }] : []),
     { key: "Vitres", value: label(tints, c.tint) },
     { key: "Chromes", value: label(trims, c.trim) },
     { key: "Hauteur", value: label(heights, c.height) },

@@ -10,6 +10,8 @@ import {
   colorGroups,
   colors,
   heights,
+  roofColors,
+  stripeColors,
   tints,
   trims,
   exhausts,
@@ -293,7 +295,27 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
           )}
 
           {tab === "style" && (
-            <Step title="Style" desc="Les détails qui font la différence : hauteur, vitres, chromes.">
+            <Step title="Style" desc="Les détails qui font la différence : toit, bandes, hauteur, vitres, chromes.">
+              {caps?.roof !== false && (
+                <>
+                  <p className="label">Toit</p>
+                  <Chips
+                    options={[{ id: ORIGINE, label: "Comme la carrosserie" }, ...roofColors]}
+                    value={c.roof ?? ORIGINE}
+                    onChange={(v) => set("roof", v)}
+                  />
+                </>
+              )}
+              {caps?.stripes !== false && (
+                <>
+                  <p className="label">Bandes capot et toit</p>
+                  <Chips
+                    options={[{ id: ORIGINE, label: "Sans" }, ...stripeColors]}
+                    value={c.stripes ?? ORIGINE}
+                    onChange={(v) => set("stripes", v)}
+                  />
+                </>
+              )}
               {caps?.height !== false && (
                 <>
                   <p className="label">Hauteur de caisse</p>
@@ -312,7 +334,7 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
                   <Chips options={trims} value={c.trim} onChange={(v) => set("trim", v)} />
                 </>
               )}
-              {caps && !caps.height && !caps.tint && !caps.trim && (
+              {caps && !caps.roof && !caps.height && !caps.tint && !caps.trim && (
                 <p className="sub">Ces réglages ne sont pas encore disponibles sur ce modèle.</p>
               )}
             </Step>
@@ -413,11 +435,20 @@ function Step({ title, desc, children }: { title: string; desc: string; children
   );
 }
 
-function Chips({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: string) => void }) {
+function Chips({
+  options,
+  value,
+  onChange,
+}: {
+  options: (Option & { hex?: string })[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="chips">
       {options.map((o) => (
         <button key={o.id} className={`chip ${value === o.id ? "on" : ""}`} onClick={() => onChange(o.id)}>
+          {o.hex && <i className="chip-dot" style={{ background: o.hex }} aria-hidden />}
           {o.label}
           {o.price ? <em> +{o.price} €</em> : null}
         </button>

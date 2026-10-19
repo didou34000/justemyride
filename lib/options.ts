@@ -64,6 +64,22 @@ export const heights = [
   { id: "basse", label: "Très basse", mm: 55 },
 ];
 
+/** Toit d'une autre couleur que la carrosserie (« toit contrasté »). */
+export const roofColors = [
+  { id: "noir", label: "Noir", hex: "#141518" },
+  { id: "blanc", label: "Blanc", hex: "#eeece6" },
+  { id: "argent", label: "Argent", hex: "#b9bdc3" },
+  { id: "rouge", label: "Rouge", hex: "#b3121b" },
+];
+
+/** Deux bandes parallèles sur le capot, le toit et le coffre. */
+export const stripeColors = [
+  { id: "blanc", label: "Blanches", hex: "#f2f0ea" },
+  { id: "noir", label: "Noires", hex: "#141518" },
+  { id: "rouge", label: "Rouges", hex: "#c4161c" },
+  { id: "argent", label: "Argent", hex: "#b9bdc3" },
+];
+
 export const wheelColors = [
   { id: "argent", label: "Argent", hex: "#c9ccd1" },
   { id: "noir", label: "Noir", hex: "#1b1c1f" },
@@ -130,6 +146,10 @@ export type Config = {
   tint: string; // id de tints
   trim: string; // id de trims
   height: string; // id de heights
+  /** Toit contrasté : id de roofColors, absent ou "origine" = comme la carrosserie. */
+  roof?: string;
+  /** Bandes : id de stripeColors, absent ou "origine" = pas de bandes. */
+  stripes?: string;
   /** Texte gravé sur la plaque du socle noir (facultatif). */
   engraving?: string;
   size: string;

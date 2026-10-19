@@ -126,7 +126,7 @@ export function HowItWorks() {
 
 /** Le manifeste : ce qui fait la différence avec une miniature de série. */
 export function Manifesto() {
-  const items = ["Couleur exacte", "Jantes", "Étriers", "Échappement", "Hauteur", "Vitres teintées", "Chromes noirs", "Plaque gravée"];
+  const items = ["Couleur exacte", "Jantes", "Étriers", "Échappement", "Toit contrasté", "Bandes", "Hauteur", "Vitres teintées", "Chromes noirs", "Plaque gravée"];
   return (
     <section className="band" data-reveal>
       <div className="band-in">
