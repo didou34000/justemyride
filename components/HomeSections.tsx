@@ -203,6 +203,9 @@ export function Trust() {
           </li>
         ))}
       </ul>
+      <p className="trust-who">
+        Une vraie personne s'occupe de ta commande. <Link href="/a-propos">Qui est derrière JustMyRide →</Link>
+      </p>
       <PayLogos />
     </section>
   );

@@ -18,6 +18,7 @@ export default function Footer() {
           <Link href="/configurer">Le garage</Link>
           <Link href="/#tailles">Tailles et prix</Link>
           <Link href="/#faq">FAQ</Link>
+          <Link href="/a-propos">Qui est derrière</Link>
         </nav>
         <nav className="foot-col" aria-label="Informations légales">
           <b>Informations</b>
