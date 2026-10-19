@@ -1,15 +1,14 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import Reveal from "@/components/Reveal";
 import StickyCta from "@/components/StickyCta";
-import { Faq, FinalCta, Hero, HowItWorks, Manifesto, Preview3D, Sizes, Trust } from "@/components/HomeSections";
-import { cars } from "@/lib/cars";
+import { Faq, FinalCta, Hero, HowItWorks, Manifesto, Sizes, Trust } from "@/components/HomeSections";
 import { sizes } from "@/lib/options";
 import JsonLd from "@/components/JsonLd";
 import { SELLER } from "@/lib/legal";
 import { abs, pageMeta, SITE_NAME, SITE_URL } from "@/lib/site";
 
 const from = Math.min(...sizes.map((s) => s.price));
-const example = cars.find((c) => c.available && c.glb)!;
 
 export const metadata = pageMeta({
   title: `Miniature personnalisée de ta voiture, d'après tes photos · ${SITE_NAME}`,
@@ -50,12 +49,12 @@ export default function Home() {
       <Hero />
       <HowItWorks />
       <Manifesto />
-      <Preview3D car={example} />
       <Sizes />
       <Trust />
       <Faq />
       <FinalCta />
       <Footer />
+      <Reveal />
       <StickyCta from={from} />
     </main>
   );

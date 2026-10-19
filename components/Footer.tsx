@@ -27,11 +27,14 @@ export default function Footer() {
         </nav>
       </div>
       <div className="foot-bottom">
-        <span>© {new Date().getFullYear()} JustMyRide · Sans lien avec les constructeurs automobiles</span>
+        <span>
+          {/* Accès au tableau de bord, discret : le « © » mène à /admin (protégé par mot de passe). */}
+          <Link href="/admin" rel="nofollow" className="foot-admin" aria-label="Espace administrateur">
+            ©
+          </Link>{" "}
+          {new Date().getFullYear()} JustMyRide · Sans lien avec les constructeurs automobiles
+        </span>
         <PayLogos small />
-        <Link href="/admin" rel="nofollow" className="foot-admin">
-          Admin
-        </Link>
       </div>
     </footer>
   );

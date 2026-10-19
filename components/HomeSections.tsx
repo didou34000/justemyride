@@ -1,8 +1,8 @@
 import Link from "next/link";
-import TryIt from "./TryIt";
+import HeroStage from "./HeroStage";
 import { accessories, sizes } from "@/lib/options";
 import { LEAD_TIME, SELLER } from "@/lib/legal";
-import type { Car } from "@/lib/cars";
+import { cars, type Car } from "@/lib/cars";
 
 /*
  * Sections de l'accueil. Tout ce qui est affirmé ici doit rester vrai et cohérent avec les CGV
@@ -42,10 +42,14 @@ export function PayLogos({ small }: { small?: boolean }) {
 }
 
 export function Hero() {
+  const car = cars.find((c) => c.available && c.glb)!;
   return (
-    <section className="hero">
+    <section className="hero night">
       <div className="hero-copy">
-        <h1>La miniature de ta voiture.</h1>
+        <span className="plate">Miniature sur mesure · 1:43 à 1:18</span>
+        <h1>
+          La miniature de <em>ta</em> voiture.
+        </h1>
         <p className="lead">
           Pas un modèle de catalogue : ta voiture, avec ses jantes, sa couleur et ses modifs. Envoie tes photos,
           valide l'aperçu 3D, on la fabrique en pièce unique.
@@ -54,8 +58,8 @@ export function Hero() {
           <Link href="/envoyer" className="cta">
             Envoyer mes photos
           </Link>
-          <Link href="/configurer" className="cta ghost">
-            Voir le garage
+          <Link href={`/configurer/${car.slug}`} className="cta ghost">
+            Essayer en 3D
           </Link>
         </div>
         <ul className="hero-facts">
@@ -70,16 +74,7 @@ export function Hero() {
           </li>
         </ul>
       </div>
-      <div className="hero-visual">
-        <figure className="hv-main">
-          <img src="/shop/v2/socle-noir.jpg" alt="Rendu 3D de la miniature d'une BMW M140i bleue sur un socle noir gravé" width={1600} height={1600} fetchPriority="high" />
-          <figcaption>Ta miniature</figcaption>
-        </figure>
-        <figure className="hv-photo">
-          <img src="/hero/photo.jpg" alt="Un conducteur photographie sa BMW bleue avec son téléphone" width={1672} height={941} />
-          <figcaption>Ta photo</figcaption>
-        </figure>
-      </div>
+      <HeroStage car={car} />
     </section>
   );
 }
@@ -107,8 +102,9 @@ export function HowItWorks() {
     },
   ];
   return (
-    <section className="block" id="comment">
+    <section className="block" id="comment" data-reveal>
       <div className="block-head">
+        <span className="plate">N°01 · Le principe</span>
         <h2>Comment ça marche</h2>
         <p>Trois étapes, et tu ne paies qu'à la fin, une fois l'aperçu validé.</p>
       </div>
@@ -116,7 +112,9 @@ export function HowItWorks() {
         {steps.map((s, i) => (
           <li key={s.t}>
             <img src={s.img} alt={s.alt} loading="lazy" width={1200} height={900} style={s.pos ? { objectPosition: s.pos } : undefined} />
-            <span className="how-n">Étape {i + 1}</span>
+            <span className="how-n">
+              <i>{i + 1}</i> Étape {i + 1} sur 3
+            </span>
             <h3>{s.t}</h3>
             <p>{s.d}</p>
           </li>
@@ -126,22 +124,17 @@ export function HowItWorks() {
   );
 }
 
-export function Preview3D({ car }: { car: Car }) {
-  return (
-    <section className="block try-block">
-      <TryIt car={car} />
-    </section>
-  );
-}
-
 /** Le manifeste : ce qui fait la différence avec une miniature de série. */
 export function Manifesto() {
   const items = ["Couleur exacte", "Jantes", "Étriers", "Échappement", "Hauteur", "Vitres teintées", "Chromes noirs", "Plaque gravée"];
   return (
-    <section className="band">
+    <section className="band" data-reveal>
       <div className="band-in">
         <p className="band-quote">
-          Une miniature de série, c'est la voiture de tout le monde. <span>Ici, c'est la tienne.</span>
+          Une miniature de série, c'est la voiture de tout le monde.{" "}
+          <span>
+            Ici, c'est la <em>tienne</em>.
+          </span>
         </p>
         <ul className="band-list" aria-label="Ce que tu peux personnaliser">
           {items.map((i) => (
@@ -159,8 +152,9 @@ export function Sizes() {
     { img: "/shop/v2/vitrine.jpg", a: accessories.find((a) => a.id === "vitrine")!, d: "À l'abri de la poussière." },
   ];
   return (
-    <section className="block" id="tailles">
+    <section className="block" id="tailles" data-reveal>
       <div className="block-head">
+        <span className="plate">N°02 · Tarifs</span>
         <h2>Tailles et prix</h2>
         <p>Prix tout compris pour la miniature et son socle blanc. Livraison standard offerte en France.</p>
       </div>
@@ -169,6 +163,7 @@ export function Sizes() {
           <li key={s.id} className={s.id === "1-24" ? "pick" : ""}>
             {s.id === "1-24" && <span className="tag">Notre conseil</span>}
             <span className="pc-scale">Échelle {s.label}</span>
+            <span className="pc-mini" aria-hidden style={{ width: `${s.id === "1-43" ? 40 : s.id === "1-24" ? 70 : 100}%` }} />
             <span className="pc-price">{s.price} €</span>
             <span className="pc-len">{s.length} de long</span>
           </li>
@@ -199,7 +194,7 @@ export function Trust() {
     ["Vérifiée avant fabrication", "Chaque modèle 3D est contrôlé à la main et validé par toi avant d'être fabriqué."],
   ];
   return (
-    <section className="block">
+    <section className="block" data-reveal>
       <ul className="trust">
         {items.map(([t, d]) => (
           <li key={t}>
@@ -265,8 +260,9 @@ export function Faq() {
     ],
   ];
   return (
-    <section className="block faq" id="faq">
+    <section className="block faq" id="faq" data-reveal>
       <div className="block-head">
+        <span className="plate">N°03 · Questions</span>
         <h2>Questions fréquentes</h2>
       </div>
       <div className="faq-list">
@@ -286,8 +282,10 @@ export function Faq() {
 
 export function FinalCta() {
   return (
-    <section className="final">
-      <h2>Ta voiture mérite sa miniature.</h2>
+    <section className="final" data-reveal>
+      <h2>
+        <em>Ta</em> voiture mérite sa miniature.
+      </h2>
       <p>Quelques photos, quelques minutes, et on s'occupe du reste.</p>
       <Link href="/envoyer" className="cta">
         Envoyer mes photos

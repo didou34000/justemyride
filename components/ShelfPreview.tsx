@@ -17,7 +17,18 @@ const CarViewer = dynamic(() => import("./CarViewer"), {
 });
 
 /** Miniature d'exemple sur l'accueil : la voiture du catalogue, sur son socle gravé. Elle tourne seule, et se fait tourner à la souris ou au doigt (sans zoom, pour ne pas bloquer le défilement). */
-export default function ShelfPreview({ car, tweak }: { car: Car; tweak?: Partial<Config> }) {
+export default function ShelfPreview({
+  car,
+  tweak,
+  framing = 1.4,
+  onReady,
+}: {
+  car: Car;
+  tweak?: Partial<Config>;
+  framing?: number;
+  /** Appelé quand le modèle 3D est chargé et affiché. */
+  onReady?: () => void;
+}) {
   const source = useMemo<ModelSource>(
     () => ({ url: car.glb!, lengthM: car.lengthM, roles: car.roles }),
     [car.glb, car.lengthM, car.roles]
@@ -42,5 +53,5 @@ export default function ShelfPreview({ car, tweak }: { car: Car; tweak?: Partial
     }),
     [car, tweak]
   );
-  return <CarViewer source={source} config={config} framing={1.4} zoom={false} />;
+  return <CarViewer source={source} config={config} framing={framing} zoom={false} onCaps={onReady} />;
 }
