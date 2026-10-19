@@ -32,6 +32,8 @@ export type Order = {
   meshy: Job | null;
   details: DetailsRecord | null;
   meshyLogos: Job | null;
+  /** Modèle Meshy découpé en pièces (Auto Split). */
+  meshySplit: Job | null;
   fichiers: Fichiers;
   /** Badges 3D de la bibliothèque pour cette voiture, s'il y en a. */
   badges: BadgeSet | null;
@@ -113,17 +115,18 @@ const detailsSkipped = (a: AnalysisRecord | null, m: Job | null, needsParts?: bo
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [analyse, meshy, details, meshyLogos, fichiers, suivi] = await Promise.all([
+  const [analyse, meshy, details, meshyLogos, meshySplit, fichiers, suivi] = await Promise.all([
     readJson<AnalysisRecord>(`submissions/${id}/analyse.json`),
     readJson<Job>(`submissions/${id}/meshy.json`),
     readJson<DetailsRecord>(`submissions/${id}/details.json`),
     readJson<Job>(`submissions/${id}/meshy-logos.json`),
+    readJson<Job>(`submissions/${id}/meshy-split.json`),
     readFichiers(id),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
   const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured(), details, fichiers);
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
-  return { id, demande: { ...demande, id }, analyse, meshy, details, meshyLogos, fichiers, badges: badgeSet(`${demande.car} ${demande.base?.label ?? ""}`), suivi, steps, progress };
+  return { id, demande: { ...demande, id }, analyse, meshy, details, meshyLogos, meshySplit, fichiers, badges: badgeSet(`${demande.car} ${demande.base?.label ?? ""}`), suivi, steps, progress };
 }
 
 /** Toutes les demandes, la plus récente d'abord. */

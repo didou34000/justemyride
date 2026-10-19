@@ -20,12 +20,19 @@ import { readFichiers } from "@/lib/fichiers";
  * Deux générations par demande : la voiture (multi-vues, les 4 faces) et les logos
  * (une seule image des badges, préparée par Claude et déposée par le propriétaire).
  */
-export type MeshyKind = "car" | "logos";
+export type MeshyKind = "car" | "logos" | "split";
 const KINDS: Record<MeshyKind, { api: string; file: string }> = {
   car: { api: "https://api.meshy.ai/openapi/v1/multi-image-to-3d", file: "meshy" },
   logos: { api: "https://api.meshy.ai/openapi/v1/image-to-3d", file: "meshy-logos" },
+  // Découpe du modèle voiture en pièces séparées (Auto Split, 10 crédits), pour colorier chaque pièce exactement.
+  split: { api: "https://api.meshy.ai/openapi/v1/print/split", file: "meshy-split" },
 };
-export const isMeshyKind = (k: unknown): k is MeshyKind => k === "car" || k === "logos";
+export const isMeshyKind = (k: unknown): k is MeshyKind => k === "car" || k === "logos" || k === "split";
+
+/** Pièces demandées à la découpe « par couleur » (10 au maximum chez Meshy). */
+const SPLIT_PROMPT =
+  process.env.MESHY_SPLIT_PROMPT ||
+  "body paint, roof and mirror caps, windows glass, headlights, front grille, wheel rims, tyres, tail lights, number plates, black plastic trim";
 // Les 4 faces nourrissent le multi-vues (Meshy en accepte 4 au maximum).
 const VIEWS = MESHY_VIEWS;
 
@@ -58,6 +65,8 @@ export type Job = {
   inputs?: string[];
   texture?: boolean;
   error?: string;
+  /** Découpe : nombre de pièces obtenues. */
+  parts?: number;
   startedAt: string;
 };
 
@@ -93,8 +102,13 @@ export async function startJob(id: string, kind: MeshyKind = "car"): Promise<Job
   if (u.today >= DAILY_LIMIT) throw new Error(`Plafond du jour atteint (${DAILY_LIMIT})`);
   if (u.month >= MONTHLY_LIMIT) throw new Error(`Plafond du mois atteint (${MONTHLY_LIMIT})`);
 
-  let photos: string[];
-  if (kind === "logos") {
+  let photos: string[] = [];
+  let input: string | undefined;
+  if (kind === "split") {
+    const car = await readJob(id, "car");
+    if (!car?.taskId || !car.glb) throw new Error("Il faut d'abord le modèle Meshy de la voiture");
+    input = car.taskId;
+  } else if (kind === "logos") {
     const logos = (await readFichiers(id)).logos;
     if (!logos) throw new Error("Dépose d'abord l'image des logos");
     photos = [logos];
@@ -113,7 +127,12 @@ export async function startJob(id: string, kind: MeshyKind = "car"): Promise<Job
   try {
     const images = await Promise.all(photos.map(asDataUri));
     // La texture coûte des crédits en plus et on repeint nous-mêmes.
-    const body = kind === "logos" ? { image_url: images[0], should_texture: texture } : { image_urls: images, should_texture: texture };
+    const body =
+      kind === "split"
+        ? { input_task_id: input, mode: "by_color", prompt: SPLIT_PROMPT, layout: "assembled" }
+        : kind === "logos"
+          ? { image_url: images[0], should_texture: texture }
+          : { image_urls: images, should_texture: texture };
     const { result } = await meshy(kind, "", { method: "POST", body: JSON.stringify(body) });
     job.status = "PENDING";
     job.taskId = result;
@@ -159,6 +178,7 @@ export async function refreshJob(id: string, kind: MeshyKind = "car"): Promise<J
   }
   job.status = t.status;
   job.progress = t.progress;
+  if (typeof t.part_count === "number") job.parts = t.part_count;
   if (t.status === "FAILED") job.error = t.task_error?.message || "Échec Meshy";
   if (t.status === "SUCCEEDED" && t.model_urls?.glb) {
     const glb = await fetch(t.model_urls.glb);
