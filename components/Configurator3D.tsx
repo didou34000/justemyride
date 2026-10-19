@@ -7,7 +7,11 @@ import PartSearch, { type Part } from "./PartSearch";
 import {
   accessories,
   caliperColors,
+  colorGroups,
   colors,
+  heights,
+  tints,
+  trims,
   exhausts,
   finishes,
   ORIGINE,
@@ -37,6 +41,7 @@ const TABS = [
   { id: "rims", label: "Jantes" },
   { id: "exhaust", label: "Échappement" },
   { id: "paint", label: "Couleur" },
+  { id: "style", label: "Style" },
   { id: "size", label: "Taille" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -59,6 +64,9 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
     rimColor: ORIGINE,
     exhaust: ORIGINE,
     caliper: ORIGINE,
+    tint: ORIGINE,
+    trim: ORIGINE,
+    height: ORIGINE,
     size: "1-24",
     accessories: [],
   });
@@ -252,17 +260,7 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
                 >
                   ↺
                 </button>
-                {colors.map((col) => (
-                  <button
-                    key={col.id}
-                    className={`swatch ${c.paint === col.hex ? "on" : ""}`}
-                    style={{ background: col.hex }}
-                    title={col.label}
-                    aria-label={col.label}
-                    onClick={() => setC((p) => ({ ...p, paint: col.hex, paintName: col.label }))}
-                  />
-                ))}
-                <label className="swatch custom" title="Couleur personnalisée">
+                <label className="swatch custom" title="Couleur exacte de ta voiture">
                   <input
                     type="color"
                     value={c.paint === ORIGINE ? "#1f3f8f" : c.paint}
@@ -271,9 +269,52 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
                   +
                 </label>
               </div>
+              {colorGroups.map((g) => (
+                <div key={g.label}>
+                  <p className="label">{g.label}</p>
+                  <div className="swatches">
+                    {g.list.map((col) => (
+                      <button
+                        key={col.id}
+                        className={`swatch ${c.paint === col.hex ? "on" : ""}`}
+                        style={{ background: col.hex }}
+                        title={col.label}
+                        aria-label={col.label}
+                        onClick={() => setC((p) => ({ ...p, paint: col.hex, paintName: col.label }))}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
               <p className="paint-name">{c.paintName}</p>
               <p className="label">Finition</p>
               <Chips options={finishes} value={c.finish} onChange={(v) => set("finish", v)} />
+            </Step>
+          )}
+
+          {tab === "style" && (
+            <Step title="Style" desc="Les détails qui font la différence : hauteur, vitres, chromes.">
+              {caps?.height !== false && (
+                <>
+                  <p className="label">Hauteur de caisse</p>
+                  <Chips options={heights} value={c.height} onChange={(v) => set("height", v)} />
+                </>
+              )}
+              {caps?.tint !== false && (
+                <>
+                  <p className="label">Vitres teintées</p>
+                  <Chips options={tints} value={c.tint} onChange={(v) => set("tint", v)} />
+                </>
+              )}
+              {caps?.trim !== false && (
+                <>
+                  <p className="label">Chromes</p>
+                  <Chips options={trims} value={c.trim} onChange={(v) => set("trim", v)} />
+                </>
+              )}
+              {caps && !caps.height && !caps.tint && !caps.trim && (
+                <p className="sub">Ces réglages ne sont pas encore disponibles sur ce modèle.</p>
+              )}
             </Step>
           )}
 
@@ -307,6 +348,17 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
                   </label>
                 ))}
               </div>
+              {c.accessories.includes("socle") && (
+                <label className="engrave">
+                  <span>Texte gravé sur la plaque (facultatif)</span>
+                  <input
+                    maxLength={32}
+                    placeholder={`Ex. ${model.name}`}
+                    value={c.engraving ?? ""}
+                    onChange={(e) => set("engraving", e.target.value)}
+                  />
+                </label>
+              )}
             </Step>
           )}
         </div>

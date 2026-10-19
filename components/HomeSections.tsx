@@ -1,5 +1,5 @@
 import Link from "next/link";
-import LazyShelf from "./LazyShelf";
+import TryIt from "./TryIt";
 import { accessories, sizes } from "@/lib/options";
 import { LEAD_TIME, SELLER } from "@/lib/legal";
 import type { Car } from "@/lib/cars";
@@ -72,7 +72,7 @@ export function Hero() {
       </div>
       <div className="hero-visual">
         <figure className="hv-main">
-          <img src="/shop/socle-noir-grave.jpg" alt="Rendu 3D de la miniature d'une BMW M140i bleue sur un socle noir gravé" width={1600} height={1600} fetchPriority="high" />
+          <img src="/shop/v2/socle-noir.jpg" alt="Rendu 3D de la miniature d'une BMW M140i bleue sur un socle noir gravé" width={1600} height={1600} fetchPriority="high" />
           <figcaption>Ta miniature</figcaption>
         </figure>
         <figure className="hv-photo">
@@ -85,22 +85,23 @@ export function Hero() {
 }
 
 export function HowItWorks() {
-  const steps = [
+  const steps: { img: string; alt: string; pos?: string; t: string; d: string }[] = [
     {
-      img: "/guide/avant-gauche.jpg",
-      alt: "Exemple de photo d'une voiture prise de trois quarts avant",
+      img: "/hero/photo.jpg",
+      alt: "Un conducteur photographie sa BMW M140i bleue avec son téléphone",
+      pos: "28% 50%",
       t: "Tu envoies tes photos",
       d: "Au minimum un trois quarts avant et un trois quarts arrière, au téléphone. Ajoute-en autant que tu veux : plus il y en a, plus elle est fidèle.",
     },
     {
       img: "/cars/bmw-m140i.jpg",
-      alt: "Aperçu 3D d'une BMW M140i bleue",
+      alt: "Aperçu 3D de la même BMW M140i bleue",
       t: "Tu valides ton aperçu 3D",
       d: "On recrée ta voiture en 3D et on te l'envoie par e-mail. Tu choisis la taille et les options, puis tu commandes.",
     },
     {
-      img: "/shop/miniature.jpg",
-      alt: "Rendu 3D de la miniature d'une BMW M140i sur son socle blanc",
+      img: "/shop/v2/socle-blanc.jpg",
+      alt: "Rendu 3D de la miniature de cette BMW M140i sur son socle blanc",
       t: "On la fabrique pour toi",
       d: `Fabriquée à la commande en ${LEAD_TIME} environ, puis expédiée chez toi.`,
     },
@@ -114,7 +115,7 @@ export function HowItWorks() {
       <ol className="how">
         {steps.map((s, i) => (
           <li key={s.t}>
-            <img src={s.img} alt={s.alt} loading="lazy" width={1200} height={900} />
+            <img src={s.img} alt={s.alt} loading="lazy" width={1200} height={900} style={s.pos ? { objectPosition: s.pos } : undefined} />
             <span className="how-n">Étape {i + 1}</span>
             <h3>{s.t}</h3>
             <p>{s.d}</p>
@@ -127,33 +128,26 @@ export function HowItWorks() {
 
 export function Preview3D({ car }: { car: Car }) {
   return (
-    <section className="block">
-      <div className="p3d">
-        <div className="p3d-stage">
-          <LazyShelf car={car} />
-          <span className="p3d-hint">Fais-la tourner</span>
-        </div>
-        <div className="p3d-copy">
-          <h2>Tu la vois en 3D avant de payer.</h2>
-          <p>
-            L'aperçu 3D, c'est ta miniature avant fabrication. Ici, la {car.make} {car.model} de notre garage : fais-la
-            tourner, puis essaie d'autres jantes, couleurs et échappements.
-          </p>
-          <ul className="ticks">
-            <li>
-              <Check /> Couleur et finition, même la teinte exacte de ta voiture
-            </li>
-            <li>
-              <Check /> Jantes, couleur des étriers, échappement
-            </li>
-            <li>
-              <Check /> Trois tailles, socle et vitrine en option
-            </li>
-          </ul>
-          <Link href={`/configurer/${car.slug}`} className="cta ghost">
-            Personnaliser cette {car.make}
-          </Link>
-        </div>
+    <section className="block try-block">
+      <TryIt car={car} />
+    </section>
+  );
+}
+
+/** Le manifeste : ce qui fait la différence avec une miniature de série. */
+export function Manifesto() {
+  const items = ["Couleur exacte", "Jantes", "Étriers", "Échappement", "Hauteur", "Vitres teintées", "Chromes noirs", "Plaque gravée"];
+  return (
+    <section className="band">
+      <div className="band-in">
+        <p className="band-quote">
+          Une miniature de série, c'est la voiture de tout le monde. <span>Ici, c'est la tienne.</span>
+        </p>
+        <ul className="band-list" aria-label="Ce que tu peux personnaliser">
+          {items.map((i) => (
+            <li key={i}>{i}</li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -161,8 +155,8 @@ export function Preview3D({ car }: { car: Car }) {
 
 export function Sizes() {
   const extras = [
-    { img: "/shop/socle-noir-grave.jpg", a: accessories.find((a) => a.id === "socle")!, d: "Plaque au nom de ta voiture." },
-    { img: "/shop/vitrine-acrylique.jpg", a: accessories.find((a) => a.id === "vitrine")!, d: "À l'abri de la poussière." },
+    { img: "/shop/v2/socle-noir.jpg", a: accessories.find((a) => a.id === "socle")!, d: "Plaque gravée du texte de ton choix." },
+    { img: "/shop/v2/vitrine.jpg", a: accessories.find((a) => a.id === "vitrine")!, d: "À l'abri de la poussière." },
   ];
   return (
     <section className="block" id="tailles">

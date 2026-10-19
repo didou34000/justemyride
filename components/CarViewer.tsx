@@ -8,7 +8,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { unzipSync } from "fflate";
 import { buildDisplay, disposeDisplay } from "./display";
 import { normalizeRim, normalizeTip, placeRims, placeTips, tint, type PartAdjust } from "./partFit";
-import { caliperColors, ORIGINE, wheelColors, type Config } from "@/lib/options";
+import { caliperColors, heights, ORIGINE, tints, wheelColors, type Config } from "@/lib/options";
 
 /*
  * Lecteur 3D du configurateur.
@@ -21,7 +21,11 @@ import { caliperColors, ORIGINE, wheelColors, type Config } from "@/lib/options"
  * Pour un modèle inconnu (Sketchfab), ils sont devinés, et le client peut corriger en cliquant.
  */
 
-export type Roles = { paint: string[]; rims: string[]; calipers: string[]; exhaust: string[]; tyres: string[] };
+export type Roles = {
+  paint: string[]; rims: string[]; calipers: string[]; exhaust: string[]; tyres: string[];
+  /** Facultatifs : vitres teintables, chromes passables en noir, disques (restent avec les roues quand on rabaisse). */
+  glass?: string[]; trim?: string[]; brakes?: string[];
+};
 export type ModelSource = { url: string; zip?: boolean; lengthM?: number; roles?: Roles };
 
 /** Noms posés par tools/prepare_car.py sur un modèle préparé (« standard »). */
@@ -29,7 +33,10 @@ const STANDARD: Roles = {
   paint: ["JMR_Paint"], rims: ["JMR_Rim"], calipers: ["JMR_Caliper"], exhaust: ["JMR_Exhaust"], tyres: ["JMR_Tyre"],
 };
 /** Ce que le modèle permet de personnaliser. */
-export type Caps = { paint: boolean; rims: boolean; rimStyles: boolean; calipers: boolean; exhaust: boolean };
+export type Caps = {
+  paint: boolean; rims: boolean; rimStyles: boolean; calipers: boolean; exhaust: boolean;
+  tint: boolean; trim: boolean; height: boolean;
+};
 export type PickRole = "paint" | "rims" | "calipers";
 
 type Wheel = { center: THREE.Vector3; radius: number; tyreRadius: number; width: number; side: number };
@@ -53,6 +60,8 @@ type Rig = {
   partRim: THREE.Group;
   partExhaust: THREE.Group;
   hideTyres: boolean;
+  /** Pour rabaisser : déplacement local de chaque pièce de caisse pour 1 m vers le bas, calculé au premier besoin. */
+  drop: Map<THREE.Mesh, { base: THREE.Vector3; unit: THREE.Vector3 }> | null;
   /** Dimensions de la voiture, pour le socle et la vitrine. */
   size: THREE.Vector3;
   display: THREE.Group | null;
@@ -464,7 +473,7 @@ function setup(scene: THREE.Scene, model: THREE.Group, source: ModelSource): Rig
     scene, meshes: kept, original, roles,
     paintMat: new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide }),
     originalPaint: new THREE.Color("#888"),
-    wheels: [], tips: [], rimGroup, exhaustGroup, partRim, partExhaust, hideTyres: false, size, display: null,
+    wheels: [], tips: [], rimGroup, exhaustGroup, partRim, partExhaust, hideTyres: false, drop: null, size, display: null,
     built: { rims: "", rimColor: "", exhaust: "" },
   };
   const paint = [...roles.paint][0];
@@ -502,8 +511,9 @@ function readAnchors(r: Rig, model: THREE.Object3D) {
   return true;
 }
 
-const emptyRoles = () => ({
+const emptyRoles = (): Record<keyof Roles, Set<Mat>> => ({
   paint: new Set<Mat>(), rims: new Set<Mat>(), calipers: new Set<Mat>(), exhaust: new Set<Mat>(), tyres: new Set<Mat>(),
+  glass: new Set<Mat>(), trim: new Set<Mat>(), brakes: new Set<Mat>(),
 });
 
 /** Rôles donnés par nom de matériau (modèles du catalogue). */
@@ -511,7 +521,7 @@ function named(meshes: THREE.Mesh[], roles: Roles) {
   const out = emptyRoles();
   for (const m of meshes) {
     const mat = m.material as Mat;
-    for (const k of Object.keys(roles) as (keyof Roles)[]) if (roles[k].includes(mat.name)) out[k].add(mat);
+    for (const k of Object.keys(roles) as (keyof Roles)[]) if (roles[k]?.includes(mat.name)) out[k].add(mat);
   }
   return out;
 }
@@ -640,6 +650,9 @@ function caps(r: Rig): Caps {
     rimStyles: r.wheels.length > 0,
     calipers: r.roles.calipers.size > 0,
     exhaust: r.tips.length > 0,
+    tint: r.roles.glass.size > 0,
+    trim: r.roles.trim.size > 0,
+    height: r.roles.rims.size > 0 && r.roles.tyres.size > 0,
   };
 }
 
@@ -674,10 +687,29 @@ function apply(r: Rig, c: Config, force = false) {
   const finish = {
     brillant: { metalness: 0.05, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 },
     metal: { metalness: 0.65, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.05 },
+    satin: { metalness: 0.25, roughness: 0.5, clearcoat: 0.4, clearcoatRoughness: 0.35 },
     mat: { metalness: 0.15, roughness: 0.78, clearcoat: 0, clearcoatRoughness: 0.5 },
-  }[c.finish as "brillant" | "metal" | "mat"] ?? { metalness: 0.4, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 };
+  }[c.finish as "brillant" | "metal" | "satin" | "mat"] ?? { metalness: 0.4, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 };
   Object.assign(p, finish);
   p.needsUpdate = true;
+
+  // Vitres teintées : on fonce la teinte et on rend le verre moins transparent.
+  const tintLevel = tints.find((t) => t.id === c.tint)?.level ?? 0;
+  recolor(r, r.roles.glass, tintLevel ? "#0b0d10" : null, (m) => {
+    m.transparent = true;
+    m.opacity = Math.max(m.opacity < 1 ? m.opacity : 0.35, tintLevel);
+    m.metalness = 0.2;
+    m.roughness = 0.05;
+  });
+
+  // Chromes passés en noir brillant (« shadow line »).
+  recolor(r, r.roles.trim, c.trim === "noir" ? "#0e0f11" : null, (m) => {
+    m.metalness = 0.3;
+    m.roughness = 0.22;
+  });
+
+  // Hauteur : la caisse descend, les roues restent posées au sol.
+  lower(r, (heights.find((h) => h.id === c.height)?.mm ?? 0) / 1000);
 
   // Étriers
   recolor(r, r.roles.calipers, caliperColors.find((x) => x.id === c.caliper)?.hex ?? null);
@@ -718,6 +750,25 @@ function apply(r: Rig, c: Config, force = false) {
     if (!stockEx && !customEx) for (const t of r.tips) r.exhaustGroup.add(buildExhaust(c.exhaust, t));
     r.built.exhaust = c.exhaust;
   }
+}
+
+function lower(r: Rig, drop: number) {
+  if (!drop && !r.drop) return;
+  if (!r.drop) {
+    const wheelMats = new Set([...r.roles.rims, ...r.roles.tyres, ...r.roles.calipers, ...r.roles.brakes]);
+    r.drop = new Map();
+    r.scene.updateMatrixWorld(true);
+    for (const m of r.meshes) {
+      if (wheelMats.has(r.original.get(m)!) || !m.parent) continue;
+      const inv = m.parent.matrixWorld.clone().invert();
+      const a = new THREE.Vector3().applyMatrix4(inv);
+      const unit = new THREE.Vector3(0, -1, 0).applyMatrix4(inv).sub(a);
+      r.drop.set(m, { base: m.position.clone(), unit });
+    }
+  }
+  for (const [m, d] of r.drop) m.position.copy(d.base).addScaledVector(d.unit, drop);
+  r.exhaustGroup.position.y = -drop;
+  r.partExhaust.position.y = -drop;
 }
 
 /* ---------- pièces provisoires ---------- */

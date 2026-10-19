@@ -1,7 +1,7 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import StickyCta from "@/components/StickyCta";
-import { Faq, FinalCta, Hero, HowItWorks, Preview3D, Sizes, Trust } from "@/components/HomeSections";
+import { Faq, FinalCta, Hero, HowItWorks, Manifesto, Preview3D, Sizes, Trust } from "@/components/HomeSections";
 import { cars } from "@/lib/cars";
 import { sizes } from "@/lib/options";
 import JsonLd from "@/components/JsonLd";
@@ -49,6 +49,7 @@ export default function Home() {
       <Nav />
       <Hero />
       <HowItWorks />
+      <Manifesto />
       <Preview3D car={example} />
       <Sizes />
       <Trust />
