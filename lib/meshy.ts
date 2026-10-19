@@ -158,7 +158,16 @@ export async function refreshJob(id: string, kind: MeshyKind = "car"): Promise<J
   if (!job?.taskId || ["FAILED", "CANCELED", "error"].includes(job.status)) return job;
   if (job.glb && job.thumb) return job;
 
-  const t = await meshy(kind, `/${job.taskId}`);
+  let t;
+  try {
+    t = await meshy(kind, `/${job.taskId}`);
+  } catch (e) {
+    // On garde la trace : sinon l'admin voit « 0 % » sans savoir pourquoi.
+    job.error = `Suivi impossible : ${(e as Error).message}`;
+    await writeJson(jobPath(id, kind), job);
+    throw e;
+  }
+  job.error = undefined;
   // Aperçu image (aussi rattrapé pour les générations finies avant que l'on garde l'aperçu).
   if (!job.thumb && t.thumbnail_url) {
     const img = await fetch(t.thumbnail_url).catch(() => null);

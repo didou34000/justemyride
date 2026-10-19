@@ -481,7 +481,14 @@ export default function AdminDemande({ order }: { order: Order }) {
               <GlbViewer src={photoSrc(meshySplit.glb)} colors />
             ) : meshySplit ? (
               <div className="glb-viewer">
-                <span>{splitFailed ? `Échec : ${meshySplit.error ?? meshySplit.status}` : `Meshy découpe… ${meshySplit.progress ?? 0} %`}</span>
+                <span>
+                  {splitFailed
+                    ? `Échec : ${meshySplit.error ?? meshySplit.status}`
+                    : meshySplit.status === "PENDING" || meshySplit.status === "starting"
+                      ? "En file d'attente chez Meshy…"
+                      : `Meshy découpe… ${meshySplit.progress ?? 0} %`}
+                  {!splitFailed && meshySplit.error ? ` (${meshySplit.error})` : ""}
+                </span>
               </div>
             ) : null}
             {fichiers.final ? (
