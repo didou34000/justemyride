@@ -17,7 +17,7 @@ export const metadata = pageMeta({
 export default function GaragePage() {
   return (
     <main>
-      <Nav link={{ href: "/#deposer", label: "Envoyer ma voiture" }} />
+      <Nav />
       <section className="garage">
         <h1>
           Choisis <i>ta</i> voiture
@@ -39,7 +39,7 @@ export default function GaragePage() {
                 <em className="car-card-go">Personnaliser →</em>
               </Link>
             ) : (
-              <Link key={car.slug} href="/#deposer" className="car-card soon">
+              <Link key={car.slug} href="/envoyer" className="car-card soon">
                 <div className="noimg soon-mark">
                   {brandLogo(car.make) ? <img src={brandLogo(car.make)} alt="" /> : <CarGlyph size={56} />}
                 </div>
@@ -54,7 +54,7 @@ export default function GaragePage() {
             )
           )}
         </div>
-        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/#deposer" className="link">Envoie-nous des photos</Link>.</p>
+        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/envoyer" className="link">Envoie-nous des photos</Link>.</p>
       </section>
       <Footer />
     </main>

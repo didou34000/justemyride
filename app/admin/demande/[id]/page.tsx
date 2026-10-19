@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!(await adminSession()))
     return (
       <main>
-        <Nav link={{ href: "/", label: "Accueil" }} />
+        <Nav link={{ href: "/", label: "Accueil", ghost: true }} />
         <AdminLogin />
       </main>
     );
@@ -24,7 +24,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!order) notFound();
   return (
     <main>
-      <Nav link={{ href: "/admin", label: "Tableau de bord" }} />
+      <Nav link={{ href: "/admin", label: "Tableau de bord", ghost: true }} />
       <AdminDemande order={order} />
       <p className="admin-back">
         <Link href="/admin" className="link">← Toutes les demandes</Link>

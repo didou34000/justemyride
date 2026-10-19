@@ -15,7 +15,7 @@ export default async function SketchfabPage({ params }: { params: Promise<{ uid:
   if (!/^[0-9a-f]{32}$/.test(uid)) notFound();
   return (
     <main>
-      <Nav link={{ href: "/configurer", label: "Changer de voiture" }} />
+      <Nav link={{ href: "/configurer", label: "Changer de voiture", ghost: true }} />
       <SketchfabModel uid={uid} />
       <Footer />
     </main>

@@ -46,7 +46,7 @@ export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
       <p style="margin:0 0 16px">
         Client : <a href="mailto:${esc(r.email)}">${esc(r.email)}</a><br>
         Base 3D : ${base}<br>
-        Photos : ${angles} angles${details ? ` + ${details} détail${details > 1 ? "s" : ""}` : ""}<br>
+        Photos : ${angles} vue${angles > 1 ? "s" : ""}${details ? ` + ${details} détail${details > 1 ? "s" : ""}` : ""}<br>
         Dossier : <code>submissions/${esc(r.id)}/</code>
       </p>
       <p style="margin:0 0 8px">Fichiers reçus :</p>

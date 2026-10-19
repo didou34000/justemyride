@@ -2,7 +2,7 @@ import { get, put } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
 export { isAdmin } from "@/lib/adminAuth";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
-import { MESHY_VIEWS } from "@/lib/steps";
+import { meshyPhotos } from "@/lib/steps";
 import { readFichiers } from "@/lib/fichiers";
 
 /**
@@ -34,7 +34,6 @@ const SPLIT_PROMPT =
   process.env.MESHY_SPLIT_PROMPT ||
   "body paint, roof and mirror caps, windows glass, headlights, front grille, wheel rims, tyres, tail lights, number plates, black plastic trim";
 // Les 4 faces nourrissent le multi-vues (Meshy en accepte 4 au maximum).
-const VIEWS = MESHY_VIEWS;
 
 const num = (v: string | undefined, d: number) => (v && /^\d+$/.test(v) ? Number(v) : d);
 export const DAILY_LIMIT = num(process.env.MESHY_DAILY_LIMIT, 2);
@@ -119,8 +118,8 @@ export async function startJob(id: string, kind: MeshyKind = "car", opts: { spli
   } else {
     const demande = await readJson<{ files: { slot: string; pathname: string }[] }>(`submissions/${id}/demande.json`);
     if (!demande) throw new Error("Demande introuvable");
-    photos = VIEWS.map((v) => demande.files.find((f) => f.slot === v)?.pathname).filter(Boolean) as string[];
-    if (photos.length < 2) throw new Error("Il faut au moins 2 des 4 faces (avant, gauche, arrière, droite)");
+    photos = meshyPhotos(demande.files);
+    if (photos.length < 2) throw new Error("Il faut au moins 2 photos de la voiture entière (hors gros plans)");
   }
 
   // Réservation avant l'appel : un double clic ne lance pas deux générations payantes.

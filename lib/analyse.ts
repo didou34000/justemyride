@@ -171,7 +171,7 @@ export async function analyse(id: string, { force = false } = {}): Promise<Analy
           }.`
         : "Aucun modèle de base choisi : compare à la version de série de cette voiture.",
       unreadable.length ? `Photos illisibles (format non pris en charge) : ${unreadable.join(", ")}.` : "",
-      "Les photos « avant », « gauche »… sont les 8 angles ; « detail-N » sont des gros plans ajoutés par le client.",
+      "Les photos « avant-gauche » (3/4 avant) et « arriere-droite » (3/4 arrière) sont obligatoires ; « photo-N » sont des vues en plus de la voiture entière et « detail-N » des gros plans (anciennes demandes : « avant », « gauche »… = 8 angles fixes). Peu de photos = dis-le dans les points incertains.",
     ]
       .filter(Boolean)
       .join("\n");

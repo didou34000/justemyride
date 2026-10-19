@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Inter_Tight } from "next/font/google";
+import { Geist, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/site";
 
-const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+const sans = Geist({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+// Le serif ne sert qu'au logo (mot « Justmyride »), validé tel quel.
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
 const description =

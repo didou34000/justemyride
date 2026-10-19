@@ -16,7 +16,7 @@ export default async function AdminPage() {
   if (!(await adminSession()))
     return (
       <main>
-        <Nav link={{ href: "/", label: "Accueil" }} />
+        <Nav link={{ href: "/", label: "Accueil", ghost: true }} />
         <AdminLogin />
       </main>
     );
@@ -25,7 +25,7 @@ export default async function AdminPage() {
 
   return (
     <main>
-      <Nav link={{ href: "/", label: "Accueil" }} />
+      <Nav link={{ href: "/", label: "Accueil", ghost: true }} />
       <section className="admin wide">
         <div className="admin-top">
           <div>

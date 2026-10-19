@@ -7,7 +7,7 @@ export const metadata = { title: "Page introuvable" };
 export default function NotFound() {
   return (
     <main>
-      <Nav link={{ href: "/configurer", label: "Le garage" }} />
+      <Nav />
       <section className="garage notfound">
         <p className="eyebrow">Erreur 404</p>
         <h1>Cette page a pris la mauvaise sortie.</h1>
