@@ -9,7 +9,7 @@ import { adminSession } from "@/lib/adminSession";
 import { listOrders, type Order } from "@/lib/orders";
 import { storageEnabled } from "@/lib/storage";
 
-export const metadata: Metadata = { title: "Admin · JustMyRide", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {

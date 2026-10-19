@@ -7,7 +7,7 @@ import AdminDemande from "@/components/AdminDemande";
 import { adminSession } from "@/lib/adminSession";
 import { getOrder } from "@/lib/orders";
 
-export const metadata: Metadata = { title: "Demande · JustMyRide", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Demande", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {

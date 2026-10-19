@@ -1,7 +1,13 @@
 import LegalPage from "@/components/LegalPage";
+import { pageMeta } from "@/lib/site";
 import { SELLER } from "@/lib/legal";
 
-export const metadata = { title: "Politique de confidentialité — JustMyRide" };
+export const metadata = pageMeta({
+  title: "Politique de confidentialité",
+  description:
+    "Comment JustMyRide utilise et protège les photos de ta voiture et tes données de commande, et comment exercer tes droits.",
+  path: "/confidentialite",
+});
 
 export default function Confidentialite() {
   return (

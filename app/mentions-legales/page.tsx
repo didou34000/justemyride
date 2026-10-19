@@ -1,7 +1,13 @@
 import LegalPage from "@/components/LegalPage";
+import { pageMeta } from "@/lib/site";
 import { HOST, SELLER } from "@/lib/legal";
 
-export const metadata = { title: "Mentions légales — JustMyRide" };
+export const metadata = pageMeta({
+  title: "Mentions légales",
+  description:
+    "Éditeur, hébergeur et propriété intellectuelle du site JustMyRide, miniatures de voitures personnalisées.",
+  path: "/mentions-legales",
+});
 
 export default function MentionsLegales() {
   return (
