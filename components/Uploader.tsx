@@ -282,7 +282,7 @@ export default function Uploader() {
       {step === "contact" && (
         <div className="contact">
           <h2 className="wz-title">Où t'envoyer ton aperçu 3D ?</h2>
-          <p className="wz-tip">On t'écrit dès qu'il est prêt. Gratuit et sans engagement.</p>
+          <p className="wz-tip">On t'écrit dès qu'il est prêt.</p>
           <div className="up-fields">
             <label>
               Ta voiture

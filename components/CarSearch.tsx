@@ -52,7 +52,7 @@ export default function CarSearch({ initial = "", onPick }: { initial?: string; 
         {state === "loading"
           ? "Recherche…"
           : state === "error"
-            ? "La recherche ne répond pas, réessaie dans un instant."
+            ? "La recherche est indisponible pour l'instant. Pas grave : envoie tes photos, on retrouve le modèle nous-mêmes."
             : q.trim().length >= 2 && hits.length === 0
               ? "Aucun modèle trouvé. Essaie avec la marque et le modèle seulement."
               : "Modèles 3D fournis par Sketchfab. Tu choisis seulement la forme de base : couleurs et pièces se règlent après."}
