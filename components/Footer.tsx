@@ -11,7 +11,9 @@ export default function Footer() {
         <Link href="/cgv">CGV</Link>
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/mentions-legales">Mentions légales</Link>
-        <Link href="/admin">Admin</Link>
+        <Link href="/admin" rel="nofollow">
+          Admin
+        </Link>
       </nav>
     </footer>
   );

@@ -1,3 +1,5 @@
+import { SITE_URL } from "./site";
+
 /**
  * Informations légales du vendeur, utilisées par les mentions légales, les CGV et la politique de confidentialité.
  * Source : registre national des entreprises (fiche Pappers, octobre 2026).
@@ -17,7 +19,8 @@ export const SELLER = {
   mediator: null as null | { name: string; url: string },
   /** Franchise en base de TVA (art. 293 B du CGI) : confirmé le 18 octobre 2026. */
   vatFranchise: true,
-  site: "https://justemyride.vercel.app",
+  /** Adresse publique : voir lib/site.ts (variable NEXT_PUBLIC_SITE_URL). */
+  site: SITE_URL,
   updated: "18 octobre 2026",
 };
 

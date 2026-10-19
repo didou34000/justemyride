@@ -1,9 +1,20 @@
 "use client";
 
 import { useMemo } from "react";
-import CarViewer, { type ModelSource } from "./CarViewer";
+import dynamic from "next/dynamic";
+import type { ModelSource } from "./CarViewer";
 import { ORIGINE, type Config } from "@/lib/options";
 import type { Car } from "@/lib/cars";
+
+// three.js (≈ 200 ko) n'est plus dans le premier chargement de l'accueil : le texte s'affiche et répond d'abord.
+const CarViewer = dynamic(() => import("./CarViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="viewer">
+      <div className="viewer-loading">Chargement du modèle 3D…</div>
+    </div>
+  ),
+});
 
 /** Miniature d'exemple sur l'accueil : la voiture du catalogue, sur son socle gravé. Elle tourne seule, et se fait tourner à la souris ou au doigt (sans zoom, pour ne pas bloquer le défilement). */
 export default function ShelfPreview({ car }: { car: Car }) {

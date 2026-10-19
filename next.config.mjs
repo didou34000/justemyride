@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Espace admin et API : jamais indexés, même si un lien y mène (en plus du mot de passe, qui reste la vraie protection).
+  async headers() {
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      { source: "/admin", headers: noindex },
+      { source: "/admin/:path*", headers: noindex },
+      { source: "/api/:path*", headers: noindex },
+    ];
+  },
 };
 
 export default nextConfig;

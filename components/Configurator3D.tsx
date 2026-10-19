@@ -157,9 +157,9 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
       <div className="panel">
         <div className="panel-head">
           <Link href="/configurer" className="link">← Changer de voiture</Link>
-          <h2>
+          <h1>
             {model.name} <small>{model.subtitle}</small>
-          </h2>
+          </h1>
         </div>
 
         {model.credit && (

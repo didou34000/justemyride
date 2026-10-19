@@ -47,7 +47,7 @@ export function PayLogos({ small }: { small?: boolean }) {
 export function TrustBar() {
   const items = [
     [icon.unique, "Pièce unique"],
-    [icon.truck, "Livraison offerte"],
+    [icon.truck, "Livraison offerte en France"],
     [icon.shield, "Refaite ou remboursée"],
     [icon.lock, "Paiement sécurisé"],
   ] as const;
@@ -98,14 +98,14 @@ export function BeforeAfter() {
       </h2>
       <div className="ba">
         <figure>
-          <img src="/hero/photo.jpg" alt="Un conducteur prend sa voiture en photo" loading="lazy" />
+          <img src="/hero/photo.jpg" alt="Un conducteur photographie sa BMW bleue avec son téléphone" loading="lazy" />
           <figcaption>Tu prends ta voiture en photo</figcaption>
         </figure>
         <span className="ba-arrow" aria-hidden>
           →
         </span>
         <figure>
-          <img src="/shop/socle-noir-grave.jpg" alt="La même voiture en miniature sur un socle noir gravé" loading="lazy" />
+          <img src="/shop/socle-noir-grave.jpg" alt="Rendu 3D de la miniature d'une BMW M140i bleue sur un socle noir gravé" loading="lazy" />
           <figcaption>On en fait ta miniature</figcaption>
         </figure>
       </div>
@@ -148,7 +148,7 @@ export function Finishes() {
       <ul className="finish-grid">
         {items.map(([src, t, d]) => (
           <li key={t}>
-            <img src={src} alt={t} loading="lazy" />
+            <img src={src} alt={`Rendu 3D : miniature avec ${t.toLowerCase()}`} loading="lazy" />
             <b>{t}</b>
             <span>{d}</span>
           </li>
@@ -169,7 +169,7 @@ export function Faq() {
     ],
     [
       "Combien de temps pour la recevoir ?",
-      <>Chaque miniature est fabriquée à la commande : environ {LEAD_TIME} de fabrication, puis le transport. La livraison est offerte en France.</>,
+      <>Chaque miniature est fabriquée à la commande : environ {LEAD_TIME} de fabrication, puis le transport. La livraison standard est offerte en France ; l'express et l'envoi hors de France sont payants, leur prix s'affiche au paiement.</>,
     ],
     [
       "Est-ce que la miniature ressemblera vraiment à l'aperçu 3D ?",

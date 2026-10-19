@@ -1,8 +1,14 @@
 import LegalPage from "@/components/LegalPage";
+import { pageMeta } from "@/lib/site";
 import { LEAD_TIME, SELLER } from "@/lib/legal";
 import { accessories, sizes } from "@/lib/options";
 
-export const metadata = { title: "Conditions générales de vente — JustMyRide" };
+export const metadata = pageMeta({
+  title: "Conditions générales de vente",
+  description:
+    "Conditions de vente des miniatures JustMyRide : prix, commande et paiement, fabrication et livraison, rétractation et garanties.",
+  path: "/cgv",
+});
 
 export default function CGV() {
   return (

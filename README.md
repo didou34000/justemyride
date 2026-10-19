@@ -12,6 +12,13 @@ npm run dev
 # http://localhost:3000
 ```
 
+## SEO
+
+- Adresse du site : une seule source, `lib/site.ts` (variable `NEXT_PUBLIC_SITE_URL`, sinon `https://justemyride.vercel.app`). Elle sert aux balises canoniques, au sitemap, à robots.txt et aux données structurées.
+- Métadonnées de chaque page publique : `pageMeta()` dans `lib/site.ts`. Pages indexables (= sitemap) : `INDEXABLE_PATHS`.
+- Contrôle automatique après un build : `npm run build && npm run seo:check` (titres, descriptions, canoniques, h1, JSON-LD, sitemap, robots, liens internes, pages privées en noindex).
+- Rapport d'audit : `/mnt/project-files/justmyride/seo/` (dossier du projet).
+
 ## Pages
 
 - **Accueil (`/`)** : la photo d'une vraie voiture se fond dans sa miniature 3D au défilement, puis garanties, étapes, tailles, finitions, envoi des photos et FAQ.
@@ -38,4 +45,4 @@ Voir `.env.example` pour la liste complète. Sans une variable, la fonction conc
 ## À faire
 
 - Désigner un médiateur de la consommation et le renseigner dans `lib/legal.ts` (`mediator`).
-- Domaine `justmyride.shop` : une fois acheté, mettre à jour `SELLER.site` (`lib/legal.ts`), la redirection du thème Shopify et l'expéditeur Resend.
+- Domaine `justmyride.shop` : une fois acheté, mettre `NEXT_PUBLIC_SITE_URL` dans Vercel, mettre à jour la redirection du thème Shopify et l'expéditeur Resend.
