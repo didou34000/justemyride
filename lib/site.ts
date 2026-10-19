@@ -60,7 +60,9 @@ export function pageMeta({
  */
 export const INDEXABLE_PATHS = [
   "/",
+  "/envoyer",
   "/configurer",
+  "/a-propos",
   ...cars.filter((c) => c.available).map((c) => `/configurer/${c.slug}`),
   "/cgv",
   "/confidentialite",

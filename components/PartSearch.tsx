@@ -110,7 +110,7 @@ export default function PartSearch({
         autoComplete="off"
       />
       {state === "loading" && <p className="sub">Recherche…</p>}
-      {state === "error" && <p className="sub">La recherche ne répond pas, réessaie dans un instant.</p>}
+      {state === "error" && <p className="sub">Pas de résultat pour l'instant. Garde la pièce d'origine, ou réessaie un peu plus tard.</p>}
       {state === "idle" && q.trim().length >= 2 && hits.length === 0 && <p className="sub">Aucune {TEXT[kind].noun} trouvée.</p>}
       {err && <p className="notice err">{err}</p>}
       {hits.length > 0 && (

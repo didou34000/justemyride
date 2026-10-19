@@ -21,6 +21,9 @@ export type Car = {
     calipers: string[];
     exhaust: string[];
     tyres: string[];
+    glass?: string[];
+    trim?: string[];
+    brakes?: string[];
   };
 };
 
@@ -40,6 +43,9 @@ export const cars: Car[] = [
       calipers: ["iCalipers1"],
       exhaust: ["iDarkChrome1"],
       tyres: ["iTyres1"],
+      glass: ["iGlass_Clear_Windshield1"],
+      trim: ["iChrome1"],
+      brakes: ["iBreak1"],
     },
   },
   { slug: "vw-golf-gti", make: "Volkswagen", model: "Golf GTI", years: "Mk7", available: false },

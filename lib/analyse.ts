@@ -110,6 +110,9 @@ Règles :
 - Si tu n'es pas sûr, mets confiance basse et traitement a_verifier : un humain relit ton point.
 Réponds en français.`;
 
+/** Nombre maximum de photos du client envoyées à Claude pour une analyse. */
+const MAX_PHOTOS = 20;
+
 /** Photo du client → JPEG réduit (les photos de téléphone dépassent la taille acceptée par l'API). */
 export async function photoBlock(slot: string, pathname: string): Promise<Anthropic.ContentBlockParam[]> {
   const { data } = await readBytes(pathname);
@@ -153,7 +156,10 @@ export async function analyse(id: string, { force = false } = {}): Promise<Analy
   try {
     const photos: Anthropic.ContentBlockParam[] = [];
     const unreadable: string[] = [];
-    for (const f of demande.files) {
+    // Au-delà de MAX_PHOTOS, la requête deviendrait trop lourde : on garde les 2 obligatoires puis les premières.
+    const shown = demande.files.slice(0, MAX_PHOTOS);
+    const skipped = demande.files.length - shown.length;
+    for (const f of shown) {
       try {
         photos.push(...(await photoBlock(f.slot, f.pathname)));
       } catch {
@@ -170,8 +176,9 @@ export async function analyse(id: string, { force = false } = {}): Promise<Analy
             base.source === "aucune" ? " — aucun modèle 3D trouvé, compare à la version de série de cette voiture" : ""
           }.`
         : "Aucun modèle de base choisi : compare à la version de série de cette voiture.",
+      skipped > 0 ? `Le client a envoyé ${demande.files.length} photos ; tu vois les ${shown.length} premières.` : "",
       unreadable.length ? `Photos illisibles (format non pris en charge) : ${unreadable.join(", ")}.` : "",
-      "Les photos « avant », « gauche »… sont les 8 angles ; « detail-N » sont des gros plans ajoutés par le client.",
+      "Les photos « avant-gauche » (3/4 avant) et « arriere-droite » (3/4 arrière) sont obligatoires ; « photo-N » sont des vues en plus de la voiture entière et « detail-N » des gros plans (anciennes demandes : « avant », « gauche »… = 8 angles fixes). Peu de photos = dis-le dans les points incertains.",
     ]
       .filter(Boolean)
       .join("\n");

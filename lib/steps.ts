@@ -29,3 +29,16 @@ export const STEPS: { key: string; label: string; who: string; tone: Tone; help:
 
 /** Les photos envoyées à Meshy pour le multi-vues (4 au maximum), dans cet ordre. */
 export const MESHY_VIEWS = ["avant", "gauche", "arriere", "droite"];
+
+/**
+ * Photos à donner à Meshy : les 4 faces si elles existent (anciennes demandes à 8 angles), sinon les 3/4 avant
+ * et arrière (les 2 photos obligatoires depuis octobre 2026) puis les autres photos. Jamais les gros plans.
+ */
+export function meshyPhotos(files: { slot: string; pathname: string }[]): string[] {
+  const order = [...MESHY_VIEWS, "avant-gauche", "arriere-droite", "arriere-gauche", "avant-droite"];
+  const ranked = [
+    ...order.map((v) => files.find((f) => f.slot === v)),
+    ...files.filter((f) => /^photo-\d+$/.test(f.slot)),
+  ].filter(Boolean) as { pathname: string }[];
+  return [...new Set(ranked.map((f) => f.pathname))].slice(0, 4);
+}

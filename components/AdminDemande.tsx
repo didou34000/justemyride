@@ -9,7 +9,7 @@ import { photoSrc } from "@/lib/photo";
 import LiveRefresh from "./LiveRefresh";
 import GlbViewer from "./GlbViewer";
 import { renderViews } from "./renderViews";
-import { MESHY_VIEWS, STEPS } from "@/lib/steps";
+import { meshyPhotos, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 
 const TRAITEMENT: Record<string, string> = {
@@ -52,7 +52,7 @@ export default function AdminDemande({ order }: { order: Order }) {
   const pieces = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
   const meshyInputs =
     meshy?.inputs ??
-    (MESHY_VIEWS.map((v) => demande.files.find((f) => f.slot === v)?.pathname).filter(Boolean) as string[]);
+    meshyPhotos(demande.files);
 
   // Générations finies avant qu'on garde l'aperçu : on va le chercher une fois chez Meshy.
   const needThumb = Boolean(meshy?.glb && !meshy.thumb && meshy.taskId);

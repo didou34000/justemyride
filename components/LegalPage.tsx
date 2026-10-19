@@ -6,7 +6,7 @@ import { SELLER } from "@/lib/legal";
 export default function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <main>
-      <Nav link={{ href: "/configurer", label: "Le garage" }} />
+      <Nav />
       <section className="legal">
         <h1>{title}</h1>
         <p className="legal-date">Dernière mise à jour : {SELLER.updated}</p>

@@ -85,7 +85,7 @@ export async function checkDetails(id: string, views: string[]): Promise<Details
   try {
     // Les angles principaux et les gros plans suffisent : pas besoin des 8 photos.
     const keep = ["avant-gauche", "arriere-droite", "avant", "arriere"];
-    const photos = demande.files.filter((f) => keep.includes(f.slot) || f.slot.startsWith("detail"));
+    const photos = demande.files.filter((f) => keep.includes(f.slot) || f.slot.startsWith("detail") || f.slot.startsWith("photo-"));
     const blocks: Anthropic.ContentBlockParam[] = [];
     for (const f of photos.slice(0, 8)) blocks.push(...(await photoBlock(f.slot, f.pathname).catch(() => [])));
     if (!blocks.length) throw new Error("Aucune photo lisible");
