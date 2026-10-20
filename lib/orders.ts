@@ -4,6 +4,7 @@ import { claudeConfigured, stale, type Rec } from "@/lib/claude";
 import { readBase, type BaseRecord } from "@/lib/base";
 import type { CouleursRec, Rapport1, Rapport2, Rapport3Rec } from "@/lib/rapports";
 import { readPieces, type Pieces } from "@/lib/meshy";
+import { jobFailed, piecesRunning, retained3d } from "@/lib/meshyShared";
 import { readFichiers, type Fichiers } from "@/lib/fichiers";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
@@ -89,11 +90,12 @@ export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn
         const want = r3?.result?.meshy.length ?? 0;
         if (r3?.status === "done" && !want) return { ...base, state: "skip", note: "rien d'essentiel à générer" };
         if (!p.jobs.length) return { ...base, state: "todo" };
-        const failed = p.jobs.filter((j) => ["FAILED", "CANCELED", "error"].includes(j.status));
-        const ok = p.jobs.filter((j) => j.glb).length;
-        if (ok + failed.length < p.jobs.length) return { ...base, state: "current", busy: true, note: `${ok}/${p.jobs.length} prête(s)` };
-        if (failed.length && !ok) return { ...base, state: "error", note: failed[0].error ?? "Échec Meshy" };
-        return { ...base, state: "done", note: `${ok} pièce(s) reçue(s)${failed.length ? `, ${failed.length} en échec` : ""}` };
+        const ok = retained3d(p).length;
+        if (piecesRunning(p)) return { ...base, state: "current", busy: true, note: `${ok}/${want} pièce(s) en 3D` };
+        if (ok >= want) return { ...base, state: "done", note: `${ok} pièce(s) en 3D` };
+        const last = p.jobs.at(-1)!;
+        if (jobFailed(last)) return { ...base, state: "error", note: last.error ?? "Échec Meshy" };
+        return { ...base, state: "current", note: `${ok}/${want} pièce(s) en 3D` };
       }
       case "retouches":
         return f.final ? { ...base, state: "done", note: "miniature déposée" } : { ...base, state: "todo" };
