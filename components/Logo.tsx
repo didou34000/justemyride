@@ -21,7 +21,7 @@ export function CarGlyph({ size = 26 }: { size?: number }) {
   );
 }
 
-/** Le signe JustMyRide : une voiture rouge dans sa vitrine, sur son socle marine. */
+/** Le signe JustMyRide : une voiture rouge dans sa vitrine, sur son socle noir. */
 export function LogoMark({ size = 54 }: { size?: number }) {
   return (
     <svg width={size} height={(size * 44) / 68} viewBox="0 0 68 44" aria-hidden className="logo-mark">
