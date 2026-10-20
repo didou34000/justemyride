@@ -1,8 +1,8 @@
 import { put } from "@vercel/blob";
 import { after, NextResponse } from "next/server";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
-import { notifyAnalysis, notifyNewRequest } from "@/lib/notify";
-import { analyse, analyseConfigured } from "@/lib/analyse";
+import { notifyNewRequest } from "@/lib/notify";
+import { fetchBase } from "@/lib/base";
 import type { Base } from "@/lib/catalog";
 
 type Submission = {
@@ -16,7 +16,7 @@ type Submission = {
   files: { slot: string; url: string; pathname: string }[];
 };
 
-// Laisse le temps à l'analyse des photos, lancée après la réponse au client.
+// Laisse le temps de télécharger le modèle Sketchfab, après la réponse au client.
 export const maxDuration = 300;
 
 /** Enregistre la demande (contact + liste des fichiers) à côté des fichiers envoyés. */
@@ -46,17 +46,14 @@ export async function POST(request: Request) {
     alert = "failed";
   }
 
-  // Le point automatique (Claude compare les photos à la base) : après la réponse, le client n'attend pas.
-  if (analyseConfigured()) {
-    after(async () => {
-      try {
-        const rec = await analyse(s.id);
-        await notifyAnalysis(s.id, s.car || s.base?.label || "Voiture", rec);
-      } catch (e) {
-        console.error("Analyse non faite :", (e as Error).message);
-      }
-    });
-  }
+  // Le modèle de base est téléchargé dans la commande tout de suite : le client n'attend pas.
+  after(async () => {
+    try {
+      await fetchBase(s.id);
+    } catch (e) {
+      console.error("Modèle de base non téléchargé :", (e as Error).message);
+    }
+  });
 
   return NextResponse.json({ id: s.id, alert });
 }

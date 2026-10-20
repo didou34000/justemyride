@@ -1,10 +1,9 @@
-import { list } from "@vercel/blob";
+import { del, list } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
-import { analyseConfigured, type AnalysisRecord } from "@/lib/analyse";
-import type { Job } from "@/lib/meshy";
-import type { DetailsRecord } from "@/lib/details";
+import { claudeConfigured, stale, type Rec } from "@/lib/claude";
+import { readBase, type BaseRecord } from "@/lib/base";
+import type { CouleursRec, Rapport1, Rapport2 } from "@/lib/rapports";
 import { readFichiers, type Fichiers } from "@/lib/fichiers";
-import { badgeSet, type BadgeSet } from "@/lib/badges";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
@@ -12,8 +11,9 @@ export { MANUAL, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/ste
 
 /**
  * Suivi des demandes pour le tableau de bord admin.
- * Chaque demande vit dans submissions/<id>/ : demande.json (envoi du client), analyse.json (le point),
- * meshy.json (génération 3D) et suivi.json (les étapes cochées à la main par le propriétaire).
+ * Chaque demande vit dans submissions/<id>/ : demande.json (envoi du client), base.json + base.glb (le modèle Sketchfab),
+ * rapport1.json, couleurs.json + couleurs.glb, rapport2.json (les passages de Claude), fichiers.json (fichiers déposés)
+ * et suivi.json (les étapes cochées à la main par le propriétaire).
  */
 
 export type Demande = {
@@ -21,6 +21,7 @@ export type Demande = {
   email: string;
   car: string;
   base?: Base | null;
+  size?: string;
   receivedAt?: string;
   files: { slot: string; pathname: string }[];
 };
@@ -28,15 +29,13 @@ export type Demande = {
 export type Order = {
   id: string;
   demande: Demande;
-  analyse: AnalysisRecord | null;
-  meshy: Job | null;
-  details: DetailsRecord | null;
-  meshyLogos: Job | null;
-  /** Modèle Meshy découpé en pièces (Auto Split). */
-  meshySplit: Job | null;
+  base: BaseRecord | null;
+  rapport1: Rec<Rapport1> | null;
+  couleurs: CouleursRec | null;
+  rapport2: Rec<Rapport2> | null;
+  /** La voiture repeinte qui compte : celle refaite dans Blender si elle a été déposée, sinon celle du site. */
+  couleursGlb?: string;
   fichiers: Fichiers;
-  /** Badges 3D de la bibliothèque pour cette voiture, s'il y en a. */
-  badges: BadgeSet | null;
   suivi: Suivi;
   steps: Step[];
   progress: number;
@@ -44,64 +43,44 @@ export type Order = {
 
 const suiviPath = (id: string) => `submissions/${id}/suivi.json`;
 
-export function buildSteps(
-  d: Demande,
-  a: AnalysisRecord | null,
-  m: Job | null,
-  s: Suivi,
-  analyseOn = true,
-  x: DetailsRecord | null = null,
-  f: Fichiers = {}
-): Step[] {
-  const badges = x?.result?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
-  const noBadges = x?.status === "done" && !badges.length;
-  const lib = badgeSet(`${d.car} ${d.base?.label ?? ""}`);
-  const needsParts = a?.result?.differences.some((x) => x.traitement === "piece_3d");
+/** État d'un passage de Claude dans le schéma. */
+function claudeStep(base: Omit<Step, "state">, r: Rec<unknown> | null, done: (r: Rec<unknown>) => string): Step {
+  if (!r) return { ...base, state: "todo" };
+  if (r.status === "error") return { ...base, state: "error", date: r.startedAt, note: r.error };
+  if (stale(r)) return { ...base, state: "error", date: r.startedAt, note: "Interrompu : relance-le." };
+  if (r.status === "running") return { ...base, state: "current", date: r.startedAt, note: "en cours", busy: true };
+  return { ...base, state: "done", date: r.startedAt, note: done(r) };
+}
+
+export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn = true): Step[] {
+  const { demande: d, base: b, rapport1: r1, couleurs: c, rapport2: r2, fichiers: f, suivi: s } = o;
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
-    if (def.key === "photos") return { ...base, state: "done" as const, date: d.receivedAt, note: `${d.files.length} photos` };
-    if (def.key === "analyse") {
-      if (!a && !analyseOn) return { ...base, state: "error" as const, note: "Clé Claude (ANTHROPIC_API_KEY) absente de Vercel : l'analyse ne peut pas partir." };
-      if (!a) return { ...base, state: "todo" as const };
-      if (a.status === "error") return { ...base, state: "error" as const, date: a.startedAt, note: a.error };
-      // Une analyse « en cours » depuis plus de 10 min a été coupée (délai du serveur dépassé).
-      if (a.status === "running" && Date.now() - Date.parse(a.startedAt) > 600_000)
-        return { ...base, state: "error" as const, date: a.startedAt, note: "Analyse interrompue : relance-la." };
-      if (a.status === "running") return { ...base, state: "current" as const, date: a.startedAt, note: "en cours", busy: true };
-      return { ...base, state: "done" as const, date: a.startedAt, note: `${a.result?.differences.length ?? 0} différence(s)` };
-    }
-    if (def.key === "pieces") {
-      if (m?.glb || m?.status === "SUCCEEDED") return { ...base, state: "done" as const, date: m.startedAt, note: "modèle reçu" };
-      if (m && ["FAILED", "CANCELED", "error"].includes(m.status)) return { ...base, state: "error" as const, date: m.startedAt, note: m.error };
-      if (m) return { ...base, state: "current" as const, date: m.startedAt, note: m.progress ? `${m.progress} %` : "en cours", busy: true };
-      if (a?.status === "done" && !needsParts) return { ...base, state: "skip" as const, note: "aucune pièce à faire" };
-      return { ...base, state: "todo" as const };
-    }
-    if (def.key === "details") {
-      if (!x) {
-        if (m?.glb) return { ...base, state: "todo" as const };
-        // Sans modèle Meshy, il n'y a rien à comparer.
-        return { ...base, state: detailsSkipped(a, m, needsParts) ? ("skip" as const) : ("todo" as const), note: "pas de modèle Meshy" };
-      }
-      if (x.status === "error") return { ...base, state: "error" as const, date: x.startedAt, note: x.error };
-      if (x.status === "running" && Date.now() - Date.parse(x.startedAt) > 600_000)
-        return { ...base, state: "error" as const, date: x.startedAt, note: "Contrôle interrompu : relance-le." };
-      if (x.status === "running") return { ...base, state: "current" as const, date: x.startedAt, note: "en cours", busy: true };
-      return { ...base, state: "done" as const, date: x.startedAt, note: `${x.result?.manques.length ?? 0} détail(s)` };
-    }
-    if (def.key === "logos") {
-      if (f.logos) return { ...base, state: "done" as const, note: "image déposée" };
-      if (lib) return { ...base, state: "done" as const, note: "badges de la bibliothèque" };
-      if (noBadges || (!x && detailsSkipped(a, m, needsParts))) return { ...base, state: "skip" as const, note: "aucun badge à faire" };
-      return { ...base, state: "todo" as const, note: badges.length ? `${badges.length} badge(s)` : undefined };
-    }
-    if (def.key === "assemblage") {
-      // Fait seulement quand la miniature terminée est déposée (l'ancienne case cochée ne compte plus).
-      if (f.final) return { ...base, state: "done" as const, note: "miniature déposée" };
-      return { ...base, state: "todo" as const };
+    const noKey = !claudeOn && ["rapport1", "couleurs", "rapport2"].includes(def.key);
+    switch (def.key) {
+      case "base":
+        if (!b) return { ...base, state: "todo" };
+        if (b.status === "error") return { ...base, state: "error", date: b.startedAt, note: b.error };
+        if (b.status === "running" && !stale(b)) return { ...base, state: "current", date: b.startedAt, note: "téléchargement", busy: true };
+        if (b.status === "running") return { ...base, state: "error", date: b.startedAt, note: "Téléchargement interrompu : relance-le." };
+        return { ...base, state: "done", date: b.startedAt, note: b.label };
+      case "photos":
+        return { ...base, state: "done", date: d.receivedAt, note: `${d.files.length} photos` };
+      case "rapport1":
+        if (noKey && !r1) return { ...base, state: "error", note: "Clé Claude (ANTHROPIC_API_KEY) absente de Vercel." };
+        return claudeStep(base, r1, (r) => `${(r as Rec<Rapport1>).result?.differences.length ?? 0} différence(s)`);
+      case "couleurs":
+        if (f.couleurs) return { ...base, state: "done", note: "refaites dans Blender" };
+        if (noKey && !c) return { ...base, state: "error", note: "Clé Claude absente de Vercel." };
+        return claudeStep(base, c, (r) => `${(r as CouleursRec).applied?.length ?? 0} matériau(x) repeint(s)`);
+      case "rapport2":
+        if (noKey && !r2) return { ...base, state: "error", note: "Clé Claude absente de Vercel." };
+        return claudeStep(base, r2, (r) => `${(r as Rec<Rapport2>).result?.formes_3d.length ?? 0} forme(s) 3D`);
+      case "retouches":
+        return f.final ? { ...base, state: "done", note: "miniature déposée" } : { ...base, state: "todo" };
     }
     const date = def.manual ? s[def.manual] : undefined;
-    return { ...base, state: date ? ("done" as const) : ("todo" as const), date };
+    return { ...base, state: date ? "done" : "todo", date };
   });
   // La première étape non faite devient l'étape en cours.
   const next = steps.find((x) => x.state === "todo");
@@ -109,24 +88,21 @@ export function buildSteps(
   return steps;
 }
 
-/** L'étape Pièces est sautée (rien à modéliser) : le contrôle des détails l'est aussi. */
-const detailsSkipped = (a: AnalysisRecord | null, m: Job | null, needsParts?: boolean) => !m && a?.status === "done" && !needsParts;
-
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [analyse, meshy, details, meshyLogos, meshySplit, fichiers, suivi] = await Promise.all([
-    readJson<AnalysisRecord>(`submissions/${id}/analyse.json`),
-    readJson<Job>(`submissions/${id}/meshy.json`),
-    readJson<DetailsRecord>(`submissions/${id}/details.json`),
-    readJson<Job>(`submissions/${id}/meshy-logos.json`),
-    readJson<Job>(`submissions/${id}/meshy-split.json`),
+  const [base, rapport1, couleurs, rapport2, fichiers, suivi] = await Promise.all([
+    readBase(id),
+    readJson<Rec<Rapport1>>(`submissions/${id}/rapport1.json`),
+    readJson<CouleursRec>(`submissions/${id}/couleurs.json`),
+    readJson<Rec<Rapport2>>(`submissions/${id}/rapport2.json`),
     readFichiers(id),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
-  const steps = buildSteps(demande, analyse, meshy, suivi, analyseConfigured(), details, fichiers);
+  const o = { demande: { ...demande, id }, base, rapport1, couleurs, rapport2, couleursGlb: fichiers.couleurs ?? couleurs?.glb, fichiers, suivi };
+  const steps = buildSteps(o, claudeConfigured());
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
-  return { id, demande: { ...demande, id }, analyse, meshy, details, meshyLogos, meshySplit, fichiers, badges: badgeSet(`${demande.car} ${demande.base?.label ?? ""}`), suivi, steps, progress };
+  return { id, ...o, steps, progress };
 }
 
 /** Toutes les demandes, la plus récente d'abord. */
@@ -151,4 +127,21 @@ export async function setManualStep(id: string, step: ManualStep, done: boolean)
   else delete suivi[step];
   await writeJson(suiviPath(id), suivi);
   return suivi;
+}
+
+/**
+ * Efface une demande (ou toutes) : tous les fichiers de submissions/<id>/ (photos, modèles, rapports).
+ * Les compteurs de plafonds (analyse/, meshy/) ne sont pas dans submissions/ : ils restent.
+ */
+export async function deleteOrders(id?: string) {
+  const prefix = id ? `submissions/${id}/` : "submissions/";
+  let cursor: string | undefined;
+  let count = 0;
+  do {
+    const page = await list({ prefix, cursor, limit: 1000 });
+    if (page.blobs.length) await del(page.blobs.map((b) => b.url));
+    count += page.blobs.length;
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return count;
 }
