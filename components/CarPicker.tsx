@@ -13,18 +13,6 @@ const short = (name: string, brand?: string) =>
 
 type View = "brand" | "model" | "generation" | "preview" | "search" | "manual";
 
-/** Lecteur Sketchfab intégré : fait tourner le modèle sans le télécharger. */
-function SketchfabEmbed({ uid, title }: { uid: string; title: string }) {
-  return (
-    <iframe
-      className="pk-embed"
-      title={title}
-      src={`https://sketchfab.com/models/${uid}/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_vr=0&ui_ar=0&ui_inspector=0&ui_annotations=0&preload=1`}
-      allow="autoplay; fullscreen; xr-spatial-tracking"
-    />
-  );
-}
-
 /** Logo de la marque, ou ses initiales si on n'a pas le logo. */
 export function BrandMark({ id, mark }: { id: string; mark: string }) {
   const logo = brandLogo(id);
@@ -168,28 +156,27 @@ export default function CarPicker({ onPick }: { onPick: (b: Base) => void }) {
 
       {view === "preview" && (
         <>
-          <div className="pk-stage">
-            {hit ? (
-              <SketchfabEmbed uid={hit.uid} title={hit.name} />
-            ) : gen?.uid ? (
-              <SketchfabEmbed uid={gen.uid} title={label} />
-            ) : garageCar ? (
+          {/* Le client voit notre rendu (voiture du garage) ou une fiche propre : jamais le modèle Sketchfab d'un inconnu.
+              Le modèle choisi (uid) part quand même avec la demande, il sert de base de travail. */}
+          {garageCar ? (
+            <div className="pk-stage">
               <ShelfPreview car={garageCar} />
-            ) : (
-              <div className="pk-empty">
-                <strong>Pas encore de modèle 3D pour cette génération.</strong>
-                <span>On la modélise à partir de tes photos, ça prend juste un peu plus de temps.</span>
+            </div>
+          ) : (
+            <div className="pk-card">
+              {brand && <BrandMark id={brand.id} mark={brand.mark} />}
+              <div>
+                <span>Ta voiture</span>
+                {gen?.hint && <p>{gen.hint}</p>}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <h2 className="wz-title">{label}</h2>
           <p className="wz-tip">
-            {gen?.uid || garageCar || hit
-              ? "C'est la forme de base de ta miniature. Couleurs, jantes et détails viendront de tes photos."
-              : "Tu peux aussi chercher un modèle proche dans la recherche libre."}
+            On part de ce modèle, puis on reproduit ta voiture d'après tes photos : couleur, jantes, modifs et détails.
           </p>
           <button className="cta full" onClick={confirm}>
-            {gen?.uid || garageCar || hit ? "C'est ma voiture, je passe aux photos" : "Continuer avec mes photos"}
+            C'est ma voiture, je passe aux photos
           </button>
           {notFound}
         </>

@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Uploader from "./Uploader";
-import { accessories, sizes } from "@/lib/options";
+import { accessories, CONFIG_KEY, sizes } from "@/lib/options";
 
 /*
  * Fiche produit : galerie à gauche, choix à droite, puis l'envoi des photos juste en dessous.
@@ -29,6 +29,23 @@ function Check() {
 export default function ProductPage({ demo, lead }: { demo?: string; lead: string }) {
   const [img, setImg] = useState(0);
   const [size, setSize] = useState("1-24");
+  const [config, setConfig] = useState<Record<string, unknown> | null>(null);
+  // Arrivée depuis le configurateur : on reprend la taille (?taille=) et ses choix, joints à la demande.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("taille");
+    if (t && sizes.some((x) => x.id === t)) setSize(t);
+    try {
+      const raw = sessionStorage.getItem(CONFIG_KEY);
+      if (raw) setConfig(JSON.parse(raw));
+    } catch {
+      /* rien à reprendre */
+    }
+  }, []);
+  const summary = config
+    ? [config.paint !== "origine" && config.paintName, config.rims !== "origine" && "jantes changées", config.caliper !== "origine" && "étriers", config.roof && config.roof !== "origine" && "toit", config.stripes && config.stripes !== "origine" && "bandes"]
+        .filter((x) => typeof x === "string" && x)
+        .join(", ")
+    : "";
   const cur = sizes.find((s) => s.id === size)!;
   const g = GALLERY[img];
 
@@ -97,7 +114,7 @@ export default function ProductPage({ demo, lead }: { demo?: string; lead: strin
           </p>
           {demo && (
             <p className="buy-demo">
-              Envie de jouer avant ? <Link href={`/configurer/${demo}`}>Essaie le configurateur 3D</Link>
+              Envie de jouer avant ? <Link href={`/configurer/${demo}?taille=${size}`}>Essaie le configurateur 3D</Link>
             </p>
           )}
         </div>
@@ -109,7 +126,7 @@ export default function ProductPage({ demo, lead }: { demo?: string; lead: strin
           <p className="lead">Gratuit et sans engagement. Ça prend deux minutes, et tu reçois ton aperçu 3D par e-mail.</p>
         </header>
         <div className="send-grid">
-          <Uploader size={size} />
+          <Uploader size={size} config={config} />
           <aside className="send-aside">
             <section>
               <h3>Ensuite</h3>
@@ -136,6 +153,22 @@ export default function ProductPage({ demo, lead }: { demo?: string; lead: strin
                 <li>
                   <Check /> Taille souhaitée : {cur.label} ({cur.price} €)
                 </li>
+                {config && (
+                  <li>
+                    <Check /> Ta configuration 3D est jointe{summary ? ` : ${summary}` : ""}{" "}
+                    <button
+                      className="link"
+                      onClick={() => {
+                        setConfig(null);
+                        try {
+                          sessionStorage.removeItem(CONFIG_KEY);
+                        } catch {}
+                      }}
+                    >
+                      Retirer
+                    </button>
+                  </li>
+                )}
                 <li>
                   <Check /> Tes photos restent privées
                 </li>

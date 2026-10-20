@@ -164,3 +164,6 @@ export function priceOf(c: Config): number {
   );
   return size + acc;
 }
+
+/** Clé (sessionStorage) où le configurateur 3D laisse ses choix pour la fiche produit, qui les joint à la demande. */
+export const CONFIG_KEY = "jmr:config";

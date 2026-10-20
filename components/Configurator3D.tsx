@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { track } from "@vercel/analytics";
 import Link from "next/link";
 import CarViewer, { SKETCHFAB, type Caps, type ModelSource, type PickRole } from "./CarViewer";
@@ -22,6 +23,7 @@ import {
   rimStyles,
   sizes,
   wheelColors,
+  CONFIG_KEY,
   type Config,
   type Option,
 } from "@/lib/options";
@@ -40,13 +42,16 @@ export type ConfigModel = {
 
 const pickLabels: Record<PickRole, string> = { paint: "Carrosserie", rims: "Jantes", calipers: "Étriers" };
 
+/** Chaque onglet a son angle de vue (avant = +Z) : de profil pour les jantes, de l'arrière pour l'échappement… */
 const TABS = [
-  { id: "rims", label: "Jantes" },
-  { id: "exhaust", label: "Échappement" },
-  { id: "paint", label: "Couleur" },
-  { id: "style", label: "Style" },
-  { id: "size", label: "Taille" },
+  { id: "rims", label: "Jantes", view: [1, 0.12, 0.18] },
+  { id: "exhaust", label: "Échappement", view: [0.55, 0.2, -0.8] },
+  { id: "paint", label: "Couleur", view: [0.66, 0.17, 0.73] },
+  { id: "style", label: "Style", view: [0.55, 0.5, 0.65] },
+  { id: "size", label: "Taille", view: [0.66, 0.17, 0.73] },
 ] as const;
+
+
 type TabId = (typeof TABS)[number]["id"];
 
 export default function Configurator3D({ model }: { model: ConfigModel }) {
@@ -91,8 +96,6 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
     setExPart(p);
     setC((x) => ({ ...x, exhaust: p ? SKETCHFAB : ORIGINE, exhaustPart: p ? `${p.name} — ${p.viewerUrl}` : undefined }));
   };
-  const [status, setStatus] = useState<"idle" | "loading" | "demo" | "error">("idle");
-  const [error, setError] = useState("");
 
   const set = <K extends keyof Config>(k: K, v: Config[K]) => setC((p) => ({ ...p, [k]: v }));
   const total = priceOf(c);
@@ -106,24 +109,22 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
   };
   const next = TABS[TABS.findIndex((t) => t.id === tab) + 1];
 
-  async function order() {
-    track("Commander", { taille: c.size, prix: priceOf(c) });
-    setStatus("loading");
-    setError("");
+  // La taille choisie sur la fiche produit (?taille=1-18) est reprise ici.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("taille");
+    if (t && sizes.some((x) => x.id === t)) setC((p) => ({ ...p, size: t }));
+  }, []);
+
+  /** Un seul parcours : la configuration part avec les photos, l'aperçu est gratuit, on ne paie qu'après. */
+  const router = useRouter();
+  function toPreview() {
+    track("Configuration envoyée", { taille: c.size, prix: priceOf(c) });
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(c),
-      });
-      const data = await res.json();
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-      else if (data.demo) setStatus("demo");
-      else throw new Error(data.error ?? "Erreur inconnue");
-    } catch (e) {
-      setError((e as Error).message);
-      setStatus("error");
+      sessionStorage.setItem(CONFIG_KEY, JSON.stringify({ ...c, price: priceOf(c) }));
+    } catch {
+      /* stockage indisponible : la fiche produit reprend au moins la taille */
     }
+    router.push(`/miniature?taille=${c.size}#envoi`);
   }
 
   return (
@@ -139,6 +140,7 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
             parts={parts}
             onPartStatus={(k, v) => setPartStatus((s) => ({ ...s, [k]: v }))}
             framing={1.35}
+            view={[...TABS.find((t) => t.id === tab)!.view] as [number, number, number]}
           />
           <div className="stage-meta">
             <span>
@@ -387,21 +389,10 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
           )}
         </div>
 
-        {(status === "demo" || status === "error") && (
-          <div className="checkout-notes">
-            {status === "demo" && (
-              <p className="notice">
-                Mode démo : le paiement Shopify n'est pas encore branché. Ta configuration est prête à être envoyée.
-              </p>
-            )}
-            {status === "error" && <p className="notice err">{error}</p>}
-          </div>
-        )}
-
         {!next && (
           <p className="order-note">
-            Pièce unique fabriquée sur mesure : pas de droit de rétractation (art. L221-28 3° du Code de la
-            consommation). Abîmée ou non conforme, on la refait ou on te rembourse. <a href="/cgv" target="_blank">CGV</a>
+            Tu ne paies rien maintenant : envoie les photos de ta voiture, on te montre ton aperçu, et tu commandes s'il te
+            plaît.
           </p>
         )}
 
@@ -417,8 +408,8 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
               Suivant : {next.label} →
             </button>
           ) : (
-            <button className="cta accent" onClick={order} disabled={status === "loading"}>
-              {status === "loading" ? "…" : "Commander"}
+            <button className="cta accent" onClick={toPreview}>
+              Recevoir mon aperçu gratuit
             </button>
           )}
         </div>
