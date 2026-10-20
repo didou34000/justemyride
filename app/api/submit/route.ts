@@ -10,6 +10,8 @@ type Submission = {
   email: string;
   car: string;
   base?: Base | null;
+  /** Taille souhaitée sur la fiche produit (1-43, 1-24, 1-18), indicative. */
+  size?: string;
   mode: "photos";
   files: { slot: string; url: string; pathname: string }[];
 };
@@ -27,6 +29,7 @@ export async function POST(request: Request) {
   if (!/^[\w-]{6,40}$/.test(s.id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   if (!/^\S+@\S+\.\S+$/.test(s.email)) return NextResponse.json({ error: "Email invalide" }, { status: 400 });
   if (!s.files?.length) return NextResponse.json({ error: "Aucun fichier" }, { status: 400 });
+  if (s.size !== undefined && !/^1-(43|24|18)$/.test(s.size)) delete s.size;
 
   await put(
     `submissions/${s.id}/demande.json`,

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Logo from "./Logo";
 import { PayLogos } from "./HomeSections";
+import { cars } from "@/lib/cars";
 import { SELLER } from "@/lib/legal";
+
+const demo = cars.find((c) => c.available && c.glb);
 
 export default function Footer() {
   return (
@@ -9,19 +12,24 @@ export default function Footer() {
       <div className="foot-top">
         <div className="foot-brand">
           <Logo />
-          <p>Miniatures de voitures personnalisées, fabriquées en pièce unique.</p>
+          <p>Miniatures de voitures personnalisées, fabriquées en pièce unique d'après tes photos.</p>
           <a href={`mailto:${SELLER.email}`}>{SELLER.email}</a>
         </div>
-        <nav className="foot-col" aria-label="Le site">
-          <b>Le site</b>
-          <Link href="/envoyer">Envoyer mes photos</Link>
-          <Link href="/configurer">Le garage</Link>
-          <Link href="/#tailles">Tailles et prix</Link>
-          <Link href="/#faq">FAQ</Link>
-          <Link href="/a-propos">Qui est derrière</Link>
+        <nav className="foot-col" aria-label="Boutique">
+          <b>Boutique</b>
+          <Link href="/miniature">La miniature</Link>
+          <Link href="/offrir">Offrir</Link>
+          {demo && <Link href={`/configurer/${demo.slug}`}>Essayer en 3D</Link>}
         </nav>
-        <nav className="foot-col" aria-label="Informations légales">
-          <b>Informations</b>
+        <nav className="foot-col" aria-label="Aide">
+          <b>Aide</b>
+          <Link href="/faq">Questions fréquentes</Link>
+          <Link href="/faq#livraison">Livraison</Link>
+          <Link href="/contact">Contact</Link>
+        </nav>
+        <nav className="foot-col" aria-label="Informations">
+          <b>JustMyRide</b>
+          <Link href="/a-propos">Qui est derrière</Link>
           <Link href="/cgv">Conditions de vente</Link>
           <Link href="/confidentialite">Confidentialité</Link>
           <Link href="/mentions-legales">Mentions légales</Link>
