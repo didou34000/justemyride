@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { unzipSync } from "fflate";
@@ -340,7 +341,8 @@ async function fetchBuffer(url: string, onProgress: (p: number) => void) {
 async function load(source: ModelSource, onProgress: (p: number) => void): Promise<THREE.Group> {
   const data = await fetchBuffer(source.url, onProgress);
   const manager = new THREE.LoadingManager();
-  const loader = new GLTFLoader(manager);
+  // Les modèles du site sont compressés (meshopt) : ~2,5 fois plus légers à télécharger.
+  const loader = new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder);
   const blobs: string[] = [];
   let input: ArrayBuffer | string = data.buffer as ArrayBuffer;
 

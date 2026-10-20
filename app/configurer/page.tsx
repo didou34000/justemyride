@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { cars } from "@/lib/cars";
@@ -27,7 +28,7 @@ export default function GaragePage() {
         <div className={`garage-grid ${ready.length === 1 ? "solo" : ""}`}>
           {ready.map((car) => (
               <Link key={car.slug} href={`/configurer/${car.slug}`} className="car-card">
-                <img src={car.thumb} alt={`Aperçu 3D de la ${car.make} ${car.model}`} width={900} height={450} />
+                <Image src={car.thumb ?? ""} alt={`Aperçu 3D de la ${car.make} ${car.model}`} width={900} height={450} sizes="(max-width: 860px) 92vw, 560px" priority />
                 <div className="car-card-body">
                   <strong>
                     {car.make} {car.model}

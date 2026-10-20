@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import ShelfPreview from "./ShelfPreview";
 import { colors, ORIGINE, type Config } from "@/lib/options";
@@ -67,18 +68,17 @@ export default function HeroStage({ car }: { car: Car }) {
       <div className={`hs-3d ${ready ? "on" : ""}`}>
         {live && <ShelfPreview car={car} tweak={tweak} framing={1.55} onReady={() => setReady(true)} />}
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         className={`hs-poster ${ready ? "off" : ""}`}
         src="/shop/v2/socle-noir.jpg"
         alt="Miniature d'une BMW M140i bleue sur son socle noir gravé"
         width={1600}
         height={1600}
-        fetchPriority="high"
+        sizes="(max-width: 860px) 92vw, 640px"
+        priority
       />
       <figure className="hs-photo" ref={photo}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hero/photo.jpg" alt="Un conducteur photographie sa BMW bleue avec son téléphone" width={1672} height={941} />
+        <Image src="/hero/photo.jpg" alt="Un conducteur photographie sa BMW bleue avec son téléphone" width={1672} height={941} sizes="(max-width: 860px) 45vw, 260px" priority />
         <figcaption>
           <span className="plate">Ta photo</span>
         </figcaption>

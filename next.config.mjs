@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Images servies en AVIF ou WebP, à la taille de l'écran.
+  images: { formats: ["image/avif", "image/webp"] },
   // Espace admin et API : jamais indexés, même si un lien y mène (en plus du mot de passe, qui reste la vraie protection).
   async headers() {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];

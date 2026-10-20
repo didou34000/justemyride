@@ -21,7 +21,7 @@ export const SELLER = {
   vatFranchise: true,
   /** Adresse publique : voir lib/site.ts (variable NEXT_PUBLIC_SITE_URL). */
   site: SITE_URL,
-  updated: "19 octobre 2026",
+  updated: "20 octobre 2026",
 };
 
 export const HOST = {

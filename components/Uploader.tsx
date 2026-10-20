@@ -4,6 +4,7 @@ import { upload, uploadPresigned } from "@vercel/blob/client";
 import { useEffect, useMemo, useState } from "react";
 import CarPicker from "./CarPicker";
 import type { Base } from "@/lib/catalog";
+import { track } from "@vercel/analytics";
 import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
 
 /*
@@ -129,6 +130,7 @@ export default function Uploader() {
         body: JSON.stringify({ id, email, car, base, mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
+      track("Photos envoyées", { photos: files.length });
       setProgress(100);
       setPhase("done");
     } catch (e) {
@@ -182,6 +184,7 @@ export default function Uploader() {
             setBase(b);
             setCar(b.label);
             setStep("photos");
+            track("Voiture choisie", { source: b.source ?? "catalogue" });
           }}
         />
       )}

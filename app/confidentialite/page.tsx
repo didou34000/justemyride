@@ -35,7 +35,11 @@ export default function Confidentialite() {
           carte.
         </li>
       </ul>
-      <p>Le site n'utilise ni cookie publicitaire ni outil de mesure d'audience.</p>
+      <p>
+        Le site n'utilise aucun cookie publicitaire. Il mesure son audience avec Vercel Web Analytics, sans cookie et
+        sans identifiant permanent : on voit le nombre de visites par page et la provenance (pays, appareil), jamais qui
+        vous êtes. Ces données ne servent qu'à améliorer le site.
+      </p>
 
       <h2>Destinataires et sous-traitants</h2>
       <ul>
