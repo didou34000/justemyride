@@ -42,7 +42,7 @@ export default function ProductPage({ demo, lead }: { demo?: string; lead: strin
     }
   }, []);
   const summary = config
-    ? [config.paintName, config.rims !== "origine" && "jantes changées", config.caliper !== "origine" && "étriers", config.roof && config.roof !== "origine" && "toit", config.stripes && config.stripes !== "origine" && "bandes"]
+    ? [config.paint !== "origine" && config.paintName, config.rims !== "origine" && "jantes changées", config.caliper !== "origine" && "étriers", config.roof && config.roof !== "origine" && "toit", config.stripes && config.stripes !== "origine" && "bandes"]
         .filter((x) => typeof x === "string" && x)
         .join(", ")
     : "";
