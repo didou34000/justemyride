@@ -26,7 +26,8 @@ type Phase = "idle" | "sending" | "done" | "error";
 const isImage = (f: File) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name);
 
 /** `size` : la taille choisie sur la fiche produit, gardée avec la demande (le client peut encore la changer à la commande). */
-export default function Uploader({ size }: { size?: string } = {}) {
+/** `config` : les choix faits dans le configurateur 3D, s'il en vient (jantes, couleur…), joints à la demande. */
+export default function Uploader({ size, config }: { size?: string; config?: Record<string, unknown> | null } = {}) {
   const [step, setStep] = useState<Step>("car");
   const [base, setBase] = useState<Base | null>(null);
   const [car, setCar] = useState("");
@@ -128,7 +129,7 @@ export default function Uploader({ size }: { size?: string } = {}) {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, email, car, base, size, mode: "photos", files: uploaded }),
+        body: JSON.stringify({ id, email, car, base, size, ...(config ? { config } : {}), mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
       track("Photos envoyées", { photos: files.length });

@@ -84,6 +84,7 @@ export default function CarViewer({
   framing = 1,
   interactive = true,
   zoom = true,
+  view,
 }: {
   source: ModelSource;
   config: Config;
@@ -99,6 +100,8 @@ export default function CarViewer({
   interactive?: boolean;
   /** false : pas de zoom à la molette ou au pincement, pour laisser la page défiler. */
   zoom?: boolean;
+  /** Direction de la caméra (avant = +Z) : la caméra y glisse en douceur quand elle change, ex. de profil pour les jantes. */
+  view?: [number, number, number];
 }) {
   const host = useRef<HTMLDivElement>(null);
   const rig = useRef<Rig | null>(null);
@@ -110,6 +113,7 @@ export default function CarViewer({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState("");
   const [touched, setTouched] = useState(false);
+  const cam = useRef<{ camera: THREE.PerspectiveCamera; controls: OrbitControls } | null>(null);
   configRef.current = config;
   pickRef.current = pick;
   cb.current = { onCaps, onPicked, onPartStatus };
@@ -149,6 +153,16 @@ export default function CarViewer({
       controls.autoRotate = false;
       setTouched(true);
     });
+    cam.current = { camera, controls };
+    // La molette seule fait défiler la page ; Ctrl/⌘ + molette zoome. Le pincement reste actif sur mobile.
+    const onWheel = (e: WheelEvent) => {
+      controls.enableZoom = zoom && (e.ctrlKey || e.metaKey);
+    };
+    const onTouch = () => {
+      controls.enableZoom = zoom;
+    };
+    el.addEventListener("wheel", onWheel, { capture: true, passive: true });
+    el.addEventListener("pointerdown", onTouch, { capture: true });
 
     const resize = () => {
       const w = el.clientWidth;
@@ -206,6 +220,9 @@ export default function CarViewer({
     return () => {
       disposed = true;
       ro.disconnect();
+      el.removeEventListener("wheel", onWheel, { capture: true });
+      el.removeEventListener("pointerdown", onTouch, { capture: true });
+      cam.current = null;
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
       renderer.setAnimationLoop(null);
@@ -220,6 +237,34 @@ export default function CarViewer({
   useEffect(() => {
     if (ready && rig.current) apply(rig.current, config);
   }, [ready, config]);
+
+  // Glisse la caméra vers la vue demandée (même distance), sans couper la main au client.
+  const viewKey = view?.join(",");
+  useEffect(() => {
+    const c = cam.current;
+    if (!ready || !c || !view) return;
+    const { camera, controls } = c;
+    controls.autoRotate = false;
+    // Interpolation en coordonnées sphériques : passe par le côté, même de l'avant à l'arrière.
+    const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    const to = new THREE.Spherical().setFromVector3(new THREE.Vector3(...view));
+    let dTheta = to.theta - from.theta;
+    if (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+    if (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+    const phi = THREE.MathUtils.clamp(to.phi, controls.minPolarAngle, controls.maxPolarAngle);
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 700);
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      const sp = new THREE.Spherical(from.radius, from.phi + (phi - from.phi) * e, from.theta + dTheta * e);
+      camera.position.setFromSpherical(sp).add(controls.target);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, viewKey]);
 
   // Socle, étagère et vitrine : reconstruits seulement quand les finitions changent.
   const socle = config.accessories.includes("socle");
@@ -308,7 +353,7 @@ export default function CarViewer({
           {failed ? `Le modèle 3D n'a pas pu se charger (${failed}).` : `Chargement du modèle 3D… ${Math.round(progress * 100)} %`}
         </div>
       )}
-      {ready && interactive && !touched && !pick && <p className="viewer-hint">{zoom ? "Fais glisser pour tourner · pince ou molette pour zoomer" : "Fais-la tourner"}</p>}
+      {ready && interactive && !touched && !pick && <p className="viewer-hint">{zoom ? "Fais glisser pour tourner · pince ou Ctrl + molette pour zoomer" : "Fais-la tourner"}</p>}
     </div>
   );
 }
