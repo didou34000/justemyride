@@ -281,7 +281,8 @@ export async function rapport2(id: string, views: string[], glb: string) {
 // ——— 7. Troisième rapport : ce qui manque encore, et les pièces à demander à Meshy ———
 
 /** Plafond strict : au maximum 4 pièces Meshy par commande. */
-export const MAX_PIECES = 4;
+/** Nombre maximum de pièces listées pour Meshy (la 3D reste plafonnée à 4 générations par commande). */
+export const MAX_PIECES = 8;
 
 export const Rapport3 = z.object({
   resume: z.string().describe("2 phrases : la V2 ressemble-t-elle vraiment à la voiture, et qu'est-ce qui manque surtout."),
@@ -302,12 +303,12 @@ export const Rapport3 = z.object({
   meshy: z
     .array(
       z.object({
-        piece: z.string().describe("La pièce à faire refaire par Meshy, une seule par ligne (ex. jante avant gauche)."),
+        piece: z.string().describe("L'élément COMPLET à faire refaire par Meshy, un seul par ligne (ex. roue avant gauche complète : jante + pneu)."),
         photo: z.string().describe("Le nom exact de la photo du client où la pièce se voit le mieux, de 3/4 de préférence (ex. avant-gauche)."),
         cadre: z
           .object({ x: z.number(), y: z.number(), l: z.number(), h: z.number() })
           .describe("Le rectangle de la pièce dans cette photo, en fractions de 0 à 1 : x,y = coin haut gauche, l = largeur, h = hauteur. Serre la pièce, sans la couper."),
-        consigne: z.string().describe("Ce que Meshy doit refaire exactement : forme, nombre de branches, détails."),
+        consigne: z.string().describe("Ce que Meshy doit refaire exactement : forme, nombre de branches, détails. Pour une roue : jante ET pneu montés ensemble."),
       })
     )
     .describe(`Les pièces essentielles à générer avec Meshy, ${MAX_PIECES} au maximum, la plus importante d'abord.`),
@@ -322,10 +323,11 @@ Ta tâche : vérifier ce qui manque encore (logos, badges, jantes, pneus, ailero
 Le but : la miniature doit VRAIMENT ressembler à la voiture du client, sans être identique au millimètre. Classe chaque manque :
 - essentiel : sans lui, le client ne reconnaît pas sa voiture (jantes différentes, aileron, kit carrosserie, badge très visible) ;
 - secondaire : un détail qu'on peut laisser tomber (un sticker à l'arrière, un petit logo, une antenne).
-Ensuite, choisis au maximum ${MAX_PIECES} pièces essentielles à faire générer en 3D par Meshy, d'après UNE photo chacune :
+Ensuite, liste (${MAX_PIECES} au maximum, la plus importante d'abord) les pièces essentielles à faire générer en 3D par Meshy, d'après UNE photo chacune :
 - prends la photo où la pièce se voit le mieux, de 3/4 de préférence (Meshy reconstruit mieux en 3/4) ;
 - donne le rectangle de la pièce dans cette photo : on recadre la photo dessus, car Meshy refait l'objet principal de l'image ;
-- une pièce par ligne ; pour des jantes identiques, une seule jante suffit (on la copiera sur les 4 roues).
+- toujours l'élément COMPLET : une roue = la jante ET son pneu (jamais la jante seule) ; un aileron avec ses pieds ; etc. ;
+- une pièce par ligne ; pour des roues identiques, une seule roue suffit (on la copiera sur les 4).
 Si rien d'essentiel ne manque, laisse la liste meshy vide.`;
 
 /** Recadre la photo sur la pièce (avec une marge) pour que Meshy ne refasse pas toute la voiture. */

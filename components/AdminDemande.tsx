@@ -8,6 +8,8 @@ import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
 import LiveRefresh from "./LiveRefresh";
 import GlbViewer from "./GlbViewer";
+import MeshyPieces from "./MeshyPieces";
+import { retained3d } from "@/lib/meshyShared";
 import { renderHighlights, renderViews } from "./renderViews";
 import { STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
@@ -69,12 +71,6 @@ export default function AdminDemande({ order }: { order: Order }) {
   const r3 = rapport3?.result;
   const v2Glb = fichiers.v2 ?? couleursGlb;
   const meshyBusy = Boolean(state("meshy")?.busy);
-  const launched = new Set(pieces.jobs.filter((j) => !["FAILED", "CANCELED", "error"].includes(j.status)).map((j) => j.index));
-  const piecesBusy = new Set(pieces.jobs.filter((j) => !["FAILED", "CANCELED", "error"].includes(j.status) && !j.glb).map((j) => j.index));
-  // Les pièces jamais faites sont cochées d'office ; une pièce déjà reçue se coche pour la refaire.
-  const [toggled, setToggled] = useState<number[]>([]);
-  const isChosen = (i: number) => !launched.has(i) !== toggled.includes(i);
-  const chosen = (r3?.meshy ?? []).map((_, i) => i).filter((i) => rapport3?.crops?.[i] && !piecesBusy.has(i) && isChosen(i));
 
   async function post(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -122,10 +118,6 @@ export default function AdminDemande({ order }: { order: Order }) {
       const views = await renderViews(photoSrc(v2Glb)).catch((e) => Promise.reject(new Error(`Rendu des vues impossible : ${e.message}`)));
       return post("/api/rapport", { id, step: "rapport3", views });
     });
-  const launchMeshy = (list: number[]) => {
-    if (!window.confirm(`Lancer ${list.length} génération(s) Meshy payante(s) ? (4 au maximum par commande)`)) return;
-    run("meshy", () => post("/api/meshy", { id, pieces: list }));
-  };
 
   // L'enchaînement automatique : chaque étape part une fois, seulement si elle n'a jamais été lancée.
   // Après une erreur, rien ne repart tout seul : on relance au bouton.
@@ -541,104 +533,7 @@ export default function AdminDemande({ order }: { order: Order }) {
           <>
             {!r3 && <p className="notice">Il faut d&apos;abord le 3e rapport.</p>}
             {r3 && !r3.meshy.length && <p className="notice">Rien d&apos;essentiel à faire générer.</p>}
-            {r3 && r3.meshy.length > 0 && (
-              <>
-                <p className="sub">
-                  Pour chaque pièce : la photo recadrée part chez Meshy, qui dessine la pièce seule de 3/4, puis la construit en 3D d&apos;après ce dessin.
-                  Vérifie les recadrages avant de lancer (payant).{" "}
-                  {pieces.jobs.length}/4 génération(s) utilisée(s) pour cette commande.
-                </p>
-                <div className="pieces">
-                  {r3.meshy.map((m, i) => {
-                    const job = [...pieces.jobs].reverse().find((j) => j.index === i);
-                    const crop = rapport3?.crops?.[i];
-                    const failed = job && ["FAILED", "CANCELED", "error"].includes(job.status);
-                    return (
-                      <div key={i} className="piece">
-                        <div className="meshy-io meshy-io3">
-                          <div className="meshy-col">
-                            {crop ? (
-                              <a href={photoSrc(crop)} target="_blank" rel="noreferrer">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="meshy-thumb" src={photoSrc(crop)} alt={`Recadrage : ${m.piece}`} />
-                              </a>
-                            ) : (
-                              <p className="notice err">Recadrage impossible (photo « {m.photo} » introuvable).</p>
-                            )}
-                          </div>
-                          <span className="meshy-arrow" aria-hidden>→</span>
-                          <div className="meshy-col">
-                            {job?.image ? (
-                              <a href={photoSrc(job.image)} target="_blank" rel="noreferrer">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="meshy-thumb" src={photoSrc(job.image)} alt={`Pièce seule de 3/4 : ${m.piece}`} />
-                              </a>
-                            ) : (
-                              <div className="glb-viewer">
-                                <span>
-                                  {!job || job.stage === "3d"
-                                    ? "Pièce seule de 3/4"
-                                    : failed
-                                      ? `Échec : ${job.error ?? job.status}`
-                                      : `Meshy dessine la pièce… ${job.progress ?? 0} %`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="meshy-arrow" aria-hidden>→</span>
-                          <div className="meshy-col">
-                            {job?.glb ? (
-                              <>
-                                <GlbViewer src={photoSrc(job.glb)} />
-                                <p className="sub">
-                                  <a className="link" href={photoSrc(job.glb)} download={`piece-${i + 1}-${id}.glb`}>Télécharger le .glb</a>
-                                </p>
-                              </>
-                            ) : (
-                              <div className="glb-viewer">
-                                <span>
-                                  {!job
-                                    ? "Pas encore lancée."
-                                    : failed
-                                      ? `Échec : ${job.error ?? job.status}`
-                                      : job.stage === "image"
-                                        ? "La 3D partira une fois le dessin fini."
-                                        : `Meshy construit la 3D… ${job.progress ?? 0} %`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <label className="piece-head">
-                          {crop && !piecesBusy.has(i) && (
-                            <input
-                              type="checkbox"
-                              checked={chosen.includes(i)}
-                              onChange={() => setToggled((t) => (t.includes(i) ? t.filter((x) => x !== i) : [...t, i]))}
-                            />
-                          )}
-                          <b>{m.piece}</b>
-                          {job?.glb && !piecesBusy.has(i) && <span className="sub">(coche pour la refaire)</span>}
-                        </label>
-                        <p className="sub">
-                          {m.consigne} · photo « {m.photo} »
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="admin-actions">
-                  <button
-                    className="cta"
-                    disabled={Boolean(busy) || !chosen.length || pieces.jobs.length >= 4}
-                    onClick={() => launchMeshy(chosen)}
-                  >
-                    {busy === "meshy" ? "Lancement…" : `Lancer Meshy (${chosen.length} pièce(s))`}
-                  </button>
-                  {pieces.jobs.length >= 4 && <span className="sub">Plafond de 4 générations atteint pour cette commande.</span>}
-                </div>
-              </>
-            )}
+            {r3 && r3.meshy.length > 0 && <MeshyPieces id={id} r3={r3} crops={rapport3?.crops} pieces={pieces} />}
           </>
         )}
 
@@ -662,9 +557,8 @@ export default function AdminDemande({ order }: { order: Order }) {
               </li>
               <li>
                 Pièces Meshy :{" "}
-                {pieces.jobs.filter((j) => j.glb).length
-                  ? pieces.jobs
-                      .filter((j) => j.glb)
+                {retained3d(pieces).length
+                  ? retained3d(pieces)
                       .map((j, k) => (
                         <span key={j.index}>
                           {k > 0 && ", "}
