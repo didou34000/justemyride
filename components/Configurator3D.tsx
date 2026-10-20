@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { track } from "@vercel/analytics";
 import Link from "next/link";
 import CarViewer, { SKETCHFAB, type Caps, type ModelSource, type PickRole } from "./CarViewer";
 import PartSearch, { type Part } from "./PartSearch";
@@ -106,6 +107,7 @@ export default function Configurator3D({ model }: { model: ConfigModel }) {
   const next = TABS[TABS.findIndex((t) => t.id === tab) + 1];
 
   async function order() {
+    track("Commander", { taille: c.size, prix: priceOf(c) });
     setStatus("loading");
     setError("");
     try {

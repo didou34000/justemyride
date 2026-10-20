@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import HeroStage from "./HeroStage";
 import { accessories, sizes } from "@/lib/options";
@@ -111,7 +112,7 @@ export function HowItWorks() {
       <ol className="how">
         {steps.map((s, i) => (
           <li key={s.t}>
-            <img src={s.img} alt={s.alt} loading="lazy" width={1200} height={900} style={s.pos ? { objectPosition: s.pos } : undefined} />
+            <Image src={s.img} alt={s.alt} width={1200} height={900} sizes="(max-width: 860px) 92vw, 380px" style={s.pos ? { objectPosition: s.pos } : undefined} />
             <span className="how-n">
               <i>{i + 1}</i> Étape {i + 1} sur 3
             </span>
@@ -172,7 +173,7 @@ export function Sizes() {
       <ul className="extras">
         {extras.map(({ img, a, d }) => (
           <li key={a.id}>
-            <img src={img} alt={`Rendu 3D : miniature avec ${a.label.toLowerCase()}`} loading="lazy" width={1600} height={1600} />
+            <Image src={img} alt={`Rendu 3D : miniature avec ${a.label.toLowerCase()}`} width={1600} height={1600} sizes="(max-width: 860px) 40vw, 200px" />
             <div>
               <b>{a.label}</b>
               <span>
