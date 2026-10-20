@@ -70,9 +70,11 @@ export default function AdminDemande({ order }: { order: Order }) {
   const v2Glb = fichiers.v2 ?? couleursGlb;
   const meshyBusy = Boolean(state("meshy")?.busy);
   const launched = new Set(pieces.jobs.filter((j) => !["FAILED", "CANCELED", "error"].includes(j.status)).map((j) => j.index));
-  // Toutes les pièces recadrées sont cochées d'office ; on décoche celles qu'on ne veut pas.
-  const [unchecked, setUnchecked] = useState<number[]>([]);
-  const chosen = (r3?.meshy ?? []).map((_, i) => i).filter((i) => rapport3?.crops?.[i] && !launched.has(i) && !unchecked.includes(i));
+  const piecesBusy = new Set(pieces.jobs.filter((j) => !["FAILED", "CANCELED", "error"].includes(j.status) && !j.glb).map((j) => j.index));
+  // Les pièces jamais faites sont cochées d'office ; une pièce déjà reçue se coche pour la refaire.
+  const [toggled, setToggled] = useState<number[]>([]);
+  const isChosen = (i: number) => !launched.has(i) !== toggled.includes(i);
+  const chosen = (r3?.meshy ?? []).map((_, i) => i).filter((i) => rapport3?.crops?.[i] && !piecesBusy.has(i) && isChosen(i));
 
   async function post(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -542,7 +544,8 @@ export default function AdminDemande({ order }: { order: Order }) {
             {r3 && r3.meshy.length > 0 && (
               <>
                 <p className="sub">
-                  Meshy refait l&apos;objet principal de l&apos;image : chaque photo est recadrée sur la pièce. Vérifie les recadrages avant de lancer (payant).{" "}
+                  Pour chaque pièce : la photo recadrée part chez Meshy, qui dessine la pièce seule de 3/4, puis la construit en 3D d&apos;après ce dessin.
+                  Vérifie les recadrages avant de lancer (payant).{" "}
                   {pieces.jobs.length}/4 génération(s) utilisée(s) pour cette commande.
                 </p>
                 <div className="pieces">
@@ -552,7 +555,7 @@ export default function AdminDemande({ order }: { order: Order }) {
                     const failed = job && ["FAILED", "CANCELED", "error"].includes(job.status);
                     return (
                       <div key={i} className="piece">
-                        <div className="meshy-io">
+                        <div className="meshy-io meshy-io3">
                           <div className="meshy-col">
                             {crop ? (
                               <a href={photoSrc(crop)} target="_blank" rel="noreferrer">
@@ -561,6 +564,25 @@ export default function AdminDemande({ order }: { order: Order }) {
                               </a>
                             ) : (
                               <p className="notice err">Recadrage impossible (photo « {m.photo} » introuvable).</p>
+                            )}
+                          </div>
+                          <span className="meshy-arrow" aria-hidden>→</span>
+                          <div className="meshy-col">
+                            {job?.image ? (
+                              <a href={photoSrc(job.image)} target="_blank" rel="noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="meshy-thumb" src={photoSrc(job.image)} alt={`Pièce seule de 3/4 : ${m.piece}`} />
+                              </a>
+                            ) : (
+                              <div className="glb-viewer">
+                                <span>
+                                  {!job || job.stage === "3d"
+                                    ? "Pièce seule de 3/4"
+                                    : failed
+                                      ? `Échec : ${job.error ?? job.status}`
+                                      : `Meshy dessine la pièce… ${job.progress ?? 0} %`}
+                                </span>
+                              </div>
                             )}
                           </div>
                           <span className="meshy-arrow" aria-hidden>→</span>
@@ -575,21 +597,28 @@ export default function AdminDemande({ order }: { order: Order }) {
                             ) : (
                               <div className="glb-viewer">
                                 <span>
-                                  {!job ? "Pas encore lancée." : failed ? `Échec : ${job.error ?? job.status}` : `Meshy travaille… ${job.progress ?? 0} %`}
+                                  {!job
+                                    ? "Pas encore lancée."
+                                    : failed
+                                      ? `Échec : ${job.error ?? job.status}`
+                                      : job.stage === "image"
+                                        ? "La 3D partira une fois le dessin fini."
+                                        : `Meshy construit la 3D… ${job.progress ?? 0} %`}
                                 </span>
                               </div>
                             )}
                           </div>
                         </div>
                         <label className="piece-head">
-                          {crop && !launched.has(i) && (
+                          {crop && !piecesBusy.has(i) && (
                             <input
                               type="checkbox"
                               checked={chosen.includes(i)}
-                              onChange={(e) => setUnchecked((u) => (e.target.checked ? u.filter((x) => x !== i) : [...u, i]))}
+                              onChange={() => setToggled((t) => (t.includes(i) ? t.filter((x) => x !== i) : [...t, i]))}
                             />
                           )}
                           <b>{m.piece}</b>
+                          {job?.glb && !piecesBusy.has(i) && <span className="sub">(coche pour la refaire)</span>}
                         </label>
                         <p className="sub">
                           {m.consigne} · photo « {m.photo} »
