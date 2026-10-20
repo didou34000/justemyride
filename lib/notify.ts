@@ -3,8 +3,6 @@
  * Sans RESEND_API_KEY ou NOTIFY_EMAIL, rien n'est envoyé : la demande reste enregistrée dans le stockage.
  */
 
-import type { AnalysisRecord } from "@/lib/analyse";
-
 // Domaine déjà vérifié sur le compte Resend ; à remplacer par justmyride.shop une fois le domaine acheté et vérifié.
 const FROM = process.env.RESEND_FROM || "JustMyRide <alertes@iksee.fr>";
 const FALLBACK_FROM = "JustMyRide <onboarding@resend.dev>";
@@ -86,47 +84,4 @@ async function sendMail(m: { to: string; key: string; replyTo?: string; subject:
     })();
     throw new Error(`Resend ${res.status} ${name} : ${body}`);
   }
-}
-
-const TRAITEMENT: Record<string, string> = {
-  couleur: "peinture",
-  decalque: "décalque",
-  piece_3d: "pièce 3D à faire",
-  a_verifier: "à vérifier",
-};
-
-/** Le point de l'analyse automatique, envoyé au propriétaire pour relecture. */
-export async function notifyAnalysis(id: string, car: string, rec: AnalysisRecord): Promise<"sent" | "off"> {
-  const key = process.env.RESEND_API_KEY;
-  const to = process.env.NOTIFY_EMAIL;
-  if (!key || !to) return "off";
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  const link = host ? `https://${host}/admin/demande/${encodeURIComponent(id)}` : "";
-  const r = rec.result;
-
-  const html = !r
-    ? `<div style="font-family:Inter,Arial,sans-serif;color:#161514"><h2>Analyse impossible : ${esc(car)}</h2><p>${esc(rec.error ?? "erreur inconnue")}</p><p>Dossier : <code>submissions/${esc(id)}/</code></p></div>`
-    : `
-    <div style="font-family:Inter,Arial,sans-serif;color:#161514;line-height:1.5">
-      <h2 style="margin:0 0 8px">Le point : ${esc(car)}</h2>
-      <p style="margin:0 0 12px">${esc(r.resume)}</p>
-      <p style="margin:0 0 12px"><b>Base :</b> ${r.base_ok ? "correspond" : "⚠ ne correspond pas"} (${esc(r.base_remarque)})</p>
-      <p style="margin:0 0 12px"><b>Couleurs :</b> carrosserie ${esc(r.couleurs.carrosserie)}, toit ${esc(r.couleurs.toit)}, jantes ${esc(r.couleurs.jantes)}${r.couleurs.autres ? `, ${esc(r.couleurs.autres)}` : ""}</p>
-      <table style="border-collapse:collapse;width:100%;font-size:14px;margin:0 0 16px">
-        <tr style="text-align:left;border-bottom:1px solid #ddd"><th>Pièce</th><th>Ce qui change</th><th>Traitement</th><th>Confiance</th></tr>
-        ${r.differences
-          .map(
-            (d) =>
-              `<tr style="border-bottom:1px solid #eee;vertical-align:top"><td style="padding:6px 8px 6px 0"><b>${esc(d.piece)}</b></td><td style="padding:6px 8px 6px 0">${esc(d.description)}<br><span style="color:#7a756d">photos : ${esc(d.photos.join(", "))}</span></td><td style="padding:6px 8px 6px 0">${esc(TRAITEMENT[d.traitement] ?? d.traitement)}</td><td style="padding:6px 0">${esc(d.confiance)}</td></tr>`
-          )
-          .join("")}
-      </table>
-      ${r.photos_a_demander.length ? `<p style="margin:0 0 8px"><b>Photos à demander :</b></p><ul>${r.photos_a_demander.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
-      ${r.alertes.length ? `<p style="margin:0 0 8px"><b>Alertes :</b></p><ul>${r.alertes.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
-      ${link ? `<p><a href="${link}">Ouvrir la demande</a></p>` : ""}
-      <p style="color:#7a756d;font-size:13px">Analyse automatique : à relire avant de lancer quoi que ce soit.</p>
-    </div>`;
-
-  await sendMail({ to, key, subject: `Le point : ${car} (${r ? `${r.differences.length} différence(s)` : "erreur"})`, html });
-  return "sent";
 }

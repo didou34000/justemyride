@@ -26,7 +26,7 @@ npm run dev
 - **Garage (`/configurer`)** : voitures du catalogue (`lib/cars.ts`) et recherche de modèles Sketchfab.
 - **Configurateur (`/configurer/[slug]`, `/configurer/sketchfab/[uid]`)** : teinte, finition, jantes, échappement, étriers, taille, socle et vitrine, avec la miniature 3D sur son socle. « Commander » crée un panier Shopify.
 - **Pages légales** : `/cgv`, `/confidentialite`, `/mentions-legales` (infos vendeur dans `lib/legal.ts`).
-- **Admin (`/admin`, protégé par mot de passe)** : suivi des demandes, analyse des photos par Claude, génération 3D Meshy.
+- **Admin (`/admin`, protégé par mot de passe)** : suivi des commandes : modèle Sketchfab téléchargé dans la commande, 1er rapport de Claude, couleurs refaites par matériau, 2e rapport (retouches Blender / formes 3D à ajouter).
 
 ## Services branchés
 
@@ -36,8 +36,7 @@ npm run dev
 | Shopify (headless) | produits, paiement, commandes | `SHOPIFY_STOREFRONT_TOKEN` (boutique et IDs de variantes dans `lib/shopify.ts`) |
 | Resend | e-mail d'alerte à chaque envoi de photos | `RESEND_API_KEY`, `NOTIFY_EMAIL`, `RESEND_FROM` (facultatif) |
 | Sketchfab | recherche et téléchargement de modèles 3D | `SKETCHFAB_API_TOKEN` |
-| Anthropic (Claude) | analyse automatique des photos | `ANTHROPIC_API_KEY`, plafonds `ANALYSE_*_LIMIT` |
-| Meshy | génération 3D depuis les photos, lancée depuis l'admin | `MESHY_API_KEY`, plafonds `MESHY_*_LIMIT` |
+| Anthropic (Claude) | rapports et couleurs de chaque commande (3 appels) | `ANTHROPIC_API_KEY`, plafonds `ANALYSE_*_LIMIT` |
 | Admin | accès au tableau de bord | `ADMIN_PASSWORD`, `ADMIN_TOKEN` |
 
 Voir `.env.example` pour la liste complète. Sans une variable, la fonction concernée se désactive (mode démo pour le stockage et le paiement).

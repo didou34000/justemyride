@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 /**
  * Visionneuse simple d'un GLB : on tourne autour à la souris ou au doigt.
@@ -33,7 +34,7 @@ export default function GlbViewer({ src, colors = false }: { src: string; colors
 
     let frame = 0;
     let disposed = false;
-    new GLTFLoader().load(
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
       src,
       (gltf) => {
         if (disposed) return;

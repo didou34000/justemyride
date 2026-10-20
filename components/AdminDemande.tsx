@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { upload, uploadPresigned } from "@vercel/blob/client";
 import { BLOB_ACCESS } from "@/lib/storage";
 import { useRouter } from "next/navigation";
@@ -8,126 +8,156 @@ import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
 import LiveRefresh from "./LiveRefresh";
 import GlbViewer from "./GlbViewer";
-import { renderViews } from "./renderViews";
-import { meshyPhotos, STEPS } from "@/lib/steps";
+import { renderHighlights, renderViews } from "./renderViews";
+import { STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 
 const TRAITEMENT: Record<string, string> = {
   couleur: "Peinture",
   decalque: "Décalque",
-  piece_3d: "Pièce 3D",
+  blender: "Blender",
+  forme_3d: "Forme 3D",
   a_verifier: "À vérifier",
 };
 
-const SOLUTION: Record<string, string> = {
+const SOURCE: Record<string, string> = {
   sketchfab: "Pièce Sketchfab",
-  decalque: "Décalque",
   a_modeliser: "À modéliser",
-  ignorer: "Ignorable",
+  decalque_relief: "Décalque en relief",
+};
+
+const RESSEMBLANCE: Record<string, string> = {
+  tres_proche: "Très proche de la vraie voiture",
+  proche: "Proche de la vraie voiture",
+  moyenne: "Ressemblance moyenne",
+  loin: "Encore loin de la vraie voiture",
 };
 
 const day = (iso?: string) =>
   iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
 
-/** Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi. */
+type Kind = "base" | "couleurs" | "final";
+
+/**
+ * Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi.
+ * Les étapes 1 à 5 s'enchaînent toutes seules tant que cette page est ouverte : c'est ce navigateur
+ * qui rend les vues 3D que Claude regarde (le serveur ne sait pas faire de 3D).
+ */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, analyse, meshy, details, meshyLogos, meshySplit, fichiers, badges: lib, suivi, steps } = order;
-  const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "photos";
+  const { id, demande, base, rapport1, couleurs, rapport2, couleursGlb, fichiers, suivi, steps } = order;
+  const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "base";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const r = analyse?.result;
+  const [uid, setUid] = useState("");
   const step = steps.find((s) => s.key === sel)!;
   const def = STEPS.find((s) => s.key === sel)!;
-  const meshyRunning = Boolean(meshy && !meshy.glb && meshy.taskId && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshy.status));
-  const splitRunning = Boolean(meshySplit && !meshySplit.glb && !["SUCCEEDED", "FAILED", "CANCELED", "error"].includes(meshySplit.status));
-  const splitFailed = Boolean(meshySplit && ["FAILED", "CANCELED", "error"].includes(meshySplit.status));
-  const analyseBusy = Boolean(steps.find((s) => s.key === "analyse")?.busy);
-  const detailsBusy = Boolean(steps.find((s) => s.key === "details")?.busy);
-  const running = analyseBusy || meshyRunning || detailsBusy || splitRunning;
-  const x = details?.result;
-  const badges = x?.manques.filter((b) => b.type === "logo_marque" || b.type === "badge_texte") ?? [];
+  const state = (k: string) => steps.find((s) => s.key === k);
+  const running = steps.some((s) => s.busy) || Boolean(busy);
+  const baseGlb = base?.status === "done" ? base.glb : undefined;
+  const r1 = rapport1?.result;
+  const c = couleurs?.result;
+  const r2 = rapport2?.result;
 
-  const pieces = r?.differences.filter((d) => d.traitement === "piece_3d") ?? [];
-  const meshyInputs =
-    meshy?.inputs ??
-    meshyPhotos(demande.files);
+  async function post(url: string, body: unknown) {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error ?? `Erreur ${res.status}`);
+    return d;
+  }
 
-  // Générations finies avant qu'on garde l'aperçu : on va le chercher une fois chez Meshy.
-  const needThumb = Boolean(meshy?.glb && !meshy.thumb && meshy.taskId);
-  useEffect(() => {
-    if (needThumb) fetch(`/api/meshy?id=${id}`).then(() => router.refresh()).catch(() => null);
-  }, [needThumb, id, router]);
-
-  // Contrôle des détails : on rend 4 vues du modèle ici (le serveur ne sait pas faire de 3D), puis Claude compare.
-  async function checkDetails() {
-    if (!meshy?.glb) return;
-    setBusy("details");
+  /** Lance une étape : label pour le bouton, work fait le rendu puis l'appel. */
+  async function run(label: string, work: () => Promise<unknown>) {
+    setBusy(label);
     setError("");
     try {
-      const views = await renderViews(photoSrc(meshy.glb));
-      const res = await fetch("/api/details", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, views }) });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) setError(d.error ?? `Erreur ${res.status}`);
+      await work();
     } catch (e) {
-      setError(`Rendu des vues impossible : ${(e as Error).message}`);
+      setError((e as Error).message);
     }
     setBusy("");
     router.refresh();
   }
 
-  // Dès que le modèle Meshy est là et qu'aucun contrôle n'a été fait, on le lance une fois tout seul.
-  const autoDetails = Boolean(meshy?.glb && !details);
-  const [autoDone, setAutoDone] = useState(false);
+  const fetchBase = (other?: string) => run("base", () => post("/api/base", { id, uid: other }));
+  const doRapport1 = () =>
+    run("rapport1", async () => {
+      if (!baseGlb) throw new Error("Pas encore de modèle de base");
+      const views = await renderViews(photoSrc(baseGlb)).catch((e) => Promise.reject(new Error(`Rendu des vues impossible : ${e.message}`)));
+      return post("/api/rapport", { id, step: "rapport1", views });
+    });
+  const doCouleurs = () =>
+    run("couleurs", async () => {
+      if (!baseGlb) throw new Error("Pas encore de modèle de base");
+      const sheets = await renderHighlights(photoSrc(baseGlb)).catch((e) => Promise.reject(new Error(`Rendu des matériaux impossible : ${e.message}`)));
+      return post("/api/rapport", { id, step: "couleurs", sheets });
+    });
+  const doRapport2 = () =>
+    run("rapport2", async () => {
+      if (!couleursGlb) throw new Error("Pas encore de voiture repeinte");
+      const views = await renderViews(photoSrc(couleursGlb)).catch((e) => Promise.reject(new Error(`Rendu des vues impossible : ${e.message}`)));
+      return post("/api/rapport", { id, step: "rapport2", views });
+    });
+
+  // L'enchaînement automatique : chaque étape part une fois, seulement si elle n'a jamais été lancée.
+  // Après une erreur, rien ne repart tout seul : on relance au bouton.
+  const started = useRef(new Set<string>());
   useEffect(() => {
-    if (autoDetails && !autoDone) {
-      setAutoDone(true);
-      checkDetails();
-    }
+    if (busy || steps.some((s) => s.busy)) return;
+    const once = (k: string, go: () => void) => {
+      if (started.current.has(k)) return;
+      started.current.add(k);
+      go();
+    };
+    if (!base) return once("base", () => fetchBase());
+    if (!baseGlb) return;
+    if (!rapport1) return once("rapport1", doRapport1);
+    if (rapport1.status !== "done") return;
+    if (!couleurs && !fichiers.couleurs) return once("couleurs", doCouleurs);
+    if (couleursGlb && !rapport2 && (fichiers.couleurs || couleurs?.status === "done")) once("rapport2", doRapport2);
   });
 
   // Dépôt d'un fichier par le propriétaire : envoi direct vers le stockage, puis enregistrement dans la demande.
-  async function pick(e: ChangeEvent<HTMLInputElement>, kind: "logos" | "final") {
+  async function pick(e: ChangeEvent<HTMLInputElement>, kind: Kind) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setBusy(kind);
-    setError("");
-    try {
+    await run(kind === "base" ? "base" : kind, async () => {
       const { mode } = await fetch("/api/storage").then((r) => r.json());
-      const ext = kind === "final" ? "glb" : (file.name.split(".").pop()?.toLowerCase() ?? "png").replace("jpeg", "jpg");
       const send = mode === "oidc" ? uploadPresigned : upload;
-      const blob = await send(`submissions/${id}/${kind}.${ext}`, file, {
+      const blob = await send(`submissions/${id}/${kind}.glb`, file, {
         access: BLOB_ACCESS,
         handleUploadUrl: "/api/admin/upload",
-        contentType: kind === "final" ? "model/gltf-binary" : file.type,
+        contentType: "model/gltf-binary",
         multipart: mode === "token" && file.size > 20 * 1024 * 1024,
       });
-      const res = await fetch("/api/admin/fichier", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, kind, pathname: blob.pathname }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error ?? `Erreur ${res.status}`);
-    } catch (err) {
-      setError(`Envoi impossible : ${(err as Error).message}`);
-    }
-    setBusy("");
+      return post("/api/admin/fichier", { id, kind, pathname: blob.pathname });
+    });
+  }
+
+  const call = (label: string, url: string, body: unknown) => run(label, () => post(url, body));
+
+  async function remove() {
+    if (!window.confirm("Effacer cette demande pour de bon (photos, modèles, rapports) ?")) return;
+    setBusy("delete");
+    await post("/api/admin/supprimer", { id }).catch((e) => setError(e.message));
+    router.push("/admin");
     router.refresh();
   }
 
-  async function call(label: string, url: string, body: unknown, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
-    setBusy(label);
-    setError("");
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = await res.json().catch(() => ({}));
-    setBusy("");
-    if (!res.ok) setError(d.error ?? `Erreur ${res.status}`);
-    router.refresh();
-  }
+  const glbDrop = (kind: Kind, label: string, primary = false) => (
+    <label className={`cta ${primary ? "" : "ghost"} ${busy ? "off" : ""}`}>
+      {busy === kind ? "Envoi…" : label}
+      <input type="file" accept=".glb,model/gltf-binary" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, kind)} />
+    </label>
+  );
+
+  const redo = (k: string, label: string, go: () => void) => (
+    <button className="cta ghost" disabled={Boolean(busy) || Boolean(state(k)?.busy)} onClick={go}>
+      {busy === k ? "En cours…" : label}
+    </button>
+  );
 
   return (
     <section className="admin wide">
@@ -137,20 +167,15 @@ export default function AdminDemande({ order }: { order: Order }) {
           <h2>{demande.car || demande.base?.label || "Voiture"}</h2>
           <p className="sub">
             <a className="link" href={`mailto:${demande.email}`}>{demande.email}</a>
-            {demande.base?.uid && (
-              <>
-                {" · "}
-                <a className="link" href={`https://sketchfab.com/3d-models/${demande.base.uid}`} target="_blank" rel="noreferrer">
-                  modèle de base
-                </a>
-              </>
-            )}
+            {demande.size && ` · taille ${demande.size.replace("-", ":")}`}
           </p>
         </div>
-        <LiveRefresh
-          every={running ? 8 : 30}
-          poll={meshyRunning ? `/api/meshy?id=${id}` : splitRunning ? `/api/meshy?id=${id}&kind=split` : undefined}
-        />
+        <span className="admin-top-r">
+          <LiveRefresh every={running ? 8 : 30} />
+          <button className="link" disabled={Boolean(busy)} onClick={remove}>
+            Effacer la demande
+          </button>
+        </span>
       </div>
 
       <Flow
@@ -178,6 +203,47 @@ export default function AdminDemande({ order }: { order: Order }) {
           </div>
         </div>
 
+        {sel === "base" && (
+          <>
+            {step.state === "error" && <p className="notice err">{step.note}</p>}
+            {step.busy && <p className="notice">Le site télécharge le modèle depuis Sketchfab…</p>}
+            {baseGlb && (
+              <>
+                <GlbViewer src={photoSrc(baseGlb)} colors />
+                <p className="sub">
+                  {base?.label}
+                  {base?.author && ` · par ${base.author}`}
+                  {base?.licence && ` · licence ${base.licence}`}
+                  {base?.sizeMb && ` · ${base.sizeMb} Mo`}
+                  {base?.uid && (
+                    <>
+                      {" · "}
+                      <a className="link" href={`https://sketchfab.com/3d-models/${base.uid}`} target="_blank" rel="noreferrer">voir sur Sketchfab</a>
+                    </>
+                  )}
+                  {" · "}
+                  <a className="link" href={photoSrc(baseGlb)} download={`base-${id}.glb`}>Télécharger le .glb</a>
+                </p>
+                {base?.source === "garage" && <p className="sub">Voiture déjà préparée du garage du site.</p>}
+              </>
+            )}
+            <h4>Changer de modèle de base</h4>
+            <p className="sub">Si le client s&apos;est trompé de génération, colle l&apos;adresse d&apos;un autre modèle Sketchfab. Refais ensuite les rapports.</p>
+            <div className="admin-actions">
+              <input style={{ flex: "1 1 280px" }} placeholder="https://sketchfab.com/3d-models/…" value={uid} onChange={(e) => setUid(e.target.value)} />
+              <button className="cta" disabled={Boolean(busy) || !uid.trim()} onClick={() => fetchBase(uid.trim())}>
+                {busy === "base" ? "Téléchargement…" : "Télécharger ce modèle"}
+              </button>
+              {!uid && base?.status === "error" && demande.base?.uid && (
+                <button className="cta ghost" disabled={Boolean(busy)} onClick={() => fetchBase()}>
+                  Réessayer
+                </button>
+              )}
+              {glbDrop("base", "Ou déposer un .glb")}
+            </div>
+          </>
+        )}
+
         {sel === "photos" && (
           <div className="admin-photos">
             {demande.files.map((f) => (
@@ -190,337 +256,210 @@ export default function AdminDemande({ order }: { order: Order }) {
           </div>
         )}
 
-        {sel === "analyse" && (
+        {sel === "rapport1" && (
           <>
-            {!analyse && <p className={`notice ${step.state === "error" ? "err" : ""}`}>{step.state === "error" ? step.note : "Pas encore analysée."}</p>}
-            {analyseBusy && <p className="notice">Claude regarde les photos, le résultat s&apos;affiche ici tout seul.</p>}
-            {analyse && step.state === "error" && <p className="notice err">Analyse impossible : {analyse.error ?? step.note}</p>}
-            {r && (
+            {!rapport1 && !baseGlb && <p className="notice">Il faut d&apos;abord le modèle de base.</p>}
+            {(step.busy || busy === "rapport1") && <p className="notice">Claude compare les photos au modèle, le rapport s&apos;affiche ici tout seul.</p>}
+            {step.state === "error" && <p className="notice err">Rapport impossible : {step.note}</p>}
+            {r1 && (
               <>
-                <p className="admin-resume">{r.resume}</p>
-                <p className={`notice ${r.base_ok ? "" : "err"}`}>
-                  <b>Base {r.base_ok ? "OK" : "à revoir"} :</b> {r.base_remarque}
+                <p className="admin-resume">{r1.resume}</p>
+                <p className={`notice ${r1.base_ok ? "" : "err"}`}>
+                  <b>Modèle de base {r1.base_ok ? "OK" : "à revoir"} :</b> {r1.base_remarque}
                 </p>
-                <p className="sub">
-                  Couleurs : carrosserie {r.couleurs.carrosserie}, toit {r.couleurs.toit}, jantes {r.couleurs.jantes}
-                  {r.couleurs.autres ? `, ${r.couleurs.autres}` : ""}
-                </p>
+                <h4>Couleurs de la vraie voiture</h4>
+                <div className="zone-chips">
+                  {r1.couleurs.map((z, i) => (
+                    <span key={i} className="zone-chip">
+                      <i style={{ background: z.hex }} />
+                      <b>{z.zone}</b> {z.couleur} · {z.finition}
+                    </span>
+                  ))}
+                </div>
+                <h4>Différences avec le modèle</h4>
                 <div className="admin-diffs">
-                  {r.differences.map((d, i) => (
+                  {r1.differences.map((d, i) => (
                     <div key={i} className={`admin-diff conf-${d.confiance}`}>
                       <div className="admin-diff-head">
-                        <strong>{d.piece}</strong>
+                        <strong>{d.ou}</strong>
                         <span className="chip on">{TRAITEMENT[d.traitement] ?? d.traitement}</span>
                       </div>
                       <p>{d.description}</p>
-                      <span className="sub">Confiance {d.confiance} · photos : {d.photos.join(", ") || "?"}</span>
-                    </div>
-                  ))}
-                  {!r.differences.length && <p className="notice">Aucune différence : la base d&apos;origine suffit.</p>}
-                </div>
-                {r.photos_a_demander.length > 0 && (
-                  <>
-                    <h4>Photos à demander au client</h4>
-                    <ul className="admin-list">{r.photos_a_demander.map((p, i) => <li key={i}>{p}</li>)}</ul>
-                  </>
-                )}
-                {r.alertes.length > 0 && (
-                  <>
-                    <h4>Alertes</h4>
-                    <ul className="admin-list">{r.alertes.map((p, i) => <li key={i}>{p}</li>)}</ul>
-                  </>
-                )}
-              </>
-            )}
-            <div className="admin-actions">
-              <button
-                className="cta ghost"
-                disabled={Boolean(busy) || analyseBusy}
-                onClick={() => call("analyse", "/api/analyse", { id, force: Boolean(analyse) })}
-              >
-                {busy === "analyse" ? "Analyse…" : analyse ? "Refaire l'analyse" : "Lancer l'analyse"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {sel === "pieces" && (
-          <>
-            {pieces.length > 0 && (
-              <>
-                <h4>Pièces différentes repérées par Claude</h4>
-                <ul className="admin-list">
-                  {pieces.map((d, i) => (
-                    <li key={i}>
-                      <b>{d.piece}</b> : {d.description}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            <div className="meshy-io">
-              <div className="meshy-col">
-                <h4>{meshy ? "Envoyé à Meshy" : "Sera envoyé à Meshy"}</h4>
-                <div className="meshy-in">
-                  {meshyInputs.map((p) => (
-                    <a key={p} href={photoSrc(p)} target="_blank" rel="noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photoSrc(p)} alt="" loading="lazy" />
-                      <span>{demande.files.find((f) => f.pathname === p)?.slot}</span>
-                    </a>
-                  ))}
-                </div>
-                <p className="sub">
-                  Multi-vues, {meshyInputs.length} photo{meshyInputs.length > 1 ? "s" : ""} de la voiture entière, texture{" "}
-                  {meshy?.texture ? "oui" : "non (on repeint nous-mêmes)"}.
-                </p>
-                <p className="notice">
-                  Pour l&apos;instant, Meshy reçoit la voiture entière. L&apos;envoi pièce par pièce (une planche avec l&apos;aileron, les jantes…) n&apos;est
-                  pas encore fait.
-                </p>
-              </div>
-              <span className="meshy-arrow" aria-hidden>→</span>
-              <div className="meshy-col">
-                <h4>Rendu Meshy</h4>
-                {meshy?.glb ? (
-                  <>
-                    <GlbViewer src={photoSrc(meshy.glb)} />
-                    <p className="sub">
-                      Tourne autour à la souris.{" "}
-                      <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>Télécharger le .glb</a>
-                    </p>
-                  </>
-                ) : meshy?.thumb ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img className="meshy-thumb" src={photoSrc(meshy.thumb)} alt="Aperçu Meshy" />
-                ) : (
-                  <div className="glb-viewer">
-                    <span>
-                      {!meshy
-                        ? "Pas encore lancé."
-                        : step.state === "error"
-                          ? `Échec : ${meshy.error ?? meshy.status}`
-                          : `Meshy travaille… ${meshy.progress ?? 0} %`}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <h4>Découpe en pièces</h4>
-            <p className="sub">
-              Meshy découpe la voiture selon les couleurs des photos (carrosserie, toit, vitres, phares, calandre, jantes, pneus, feux, plaques, plastiques
-              noirs). Chaque pièce reçoit ensuite sa couleur exacte, au lieu de zones devinées à l&apos;œil.
-            </p>
-            {meshySplit?.glb ? (
-              <GlbViewer src={photoSrc(meshySplit.glb)} colors />
-            ) : meshySplit ? (
-              <div className="glb-viewer">
-                <span>
-                  {splitFailed
-                    ? `Échec : ${meshySplit.error ?? meshySplit.status}`
-                    : meshySplit.status === "PENDING" || meshySplit.status === "starting"
-                      ? "En file d'attente chez Meshy…"
-                      : `Meshy découpe… ${meshySplit.progress ?? 0} %`}
-                  {!splitFailed && meshySplit.error ? ` (${meshySplit.error})` : ""}
-                </span>
-              </div>
-            ) : null}
-            {meshy?.autoSplit && !meshySplit && meshy.splitError && <p className="notice err">Découpe automatique impossible : {meshy.splitError}</p>}
-            {meshy?.autoSplit && !meshySplit && !meshy.splitError && <p className="sub">La découpe partira toute seule dès que le modèle sera prêt.</p>}
-
-            <div className="admin-actions">
-              {!meshy ? (
-                <>
-                  <button
-                    className="cta"
-                    disabled={Boolean(busy)}
-                    onClick={() =>
-                      call(
-                        "meshy",
-                        "/api/meshy",
-                        { id, split: true },
-                        "Générer la voiture en 3D puis la découper en pièces ? (payant : génération Meshy + 10 crédits pour la découpe)",
-                      )
-                    }
-                  >
-                    {busy === "meshy" ? "Lancement…" : "Générer et découper en pièces"}
-                  </button>
-                  <button
-                    className="cta ghost"
-                    disabled={Boolean(busy)}
-                    onClick={() => call("meshy", "/api/meshy", { id }, "Lancer une génération Meshy payante à partir des 4 faces de la voiture ?")}
-                  >
-                    Générer d&apos;un bloc
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="cta ghost"
-                  disabled={Boolean(busy) || !meshy.glb || Boolean(meshySplit) || Boolean(meshy.autoSplit && !meshy.splitError)}
-                  onClick={() => call("split", "/api/meshy", { id, kind: "split" }, "Découper le modèle Meshy en pièces ? (payant : 10 crédits Meshy)")}
-                >
-                  {meshySplit ? "Découpe lancée" : busy === "split" ? "Lancement…" : "Découper en pièces (Meshy, 10 crédits)"}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-
-        {sel === "details" && (
-          <>
-            {!meshy?.glb && <p className="notice">Il faut d&apos;abord le modèle Meshy (bloc Pièces 3D).</p>}
-            {(detailsBusy || busy === "details") && (
-              <p className="notice">Claude compare le modèle Meshy aux photos, le résultat s&apos;affiche ici tout seul.</p>
-            )}
-            {step.state === "error" && <p className="notice err">Contrôle impossible : {details?.error ?? step.note}</p>}
-            {x && (
-              <>
-                <p className="admin-resume">{x.resume}</p>
-                <div className="admin-diffs">
-                  {x.manques.map((d, i) => (
-                    <div key={i} className={`admin-diff imp-${d.importance}`}>
-                      <div className="admin-diff-head">
-                        <strong>{d.detail}</strong>
-                        <span className="chip on">{SOLUTION[d.solution] ?? d.solution}</span>
-                      </div>
-                      <p>{d.ou}</p>
-                      {d.type === "logo_marque" && (
-                        <p className="notice warn">Logo de marque déposée : on ne le reproduit pas tel quel. À toi de décider (décalque générique, monogramme, ou rien).</p>
-                      )}
                       <span className="sub">
-                        Importance {d.importance}
-                        {d.recherche && (
-                          <>
-                            {" · "}
-                            <a
-                              className="link"
-                              href={`https://sketchfab.com/search?q=${encodeURIComponent(d.recherche)}&type=models`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              chercher « {d.recherche} » sur Sketchfab
-                            </a>
-                          </>
-                        )}
+                        {d.categorie.replace(/_/g, " ")} · confiance {d.confiance} · photos : {d.photos.join(", ") || "?"}
                       </span>
                     </div>
                   ))}
-                  {!x.manques.length && <p className="notice">Rien d&apos;important ne manque.</p>}
+                  {!r1.differences.length && <p className="notice">Aucune différence : le modèle de base suffit.</p>}
                 </div>
-                {x.alertes.length > 0 && (
+                {r1.photos_a_demander.length > 0 && (
                   <>
-                    <h4>Problèmes du rendu Meshy</h4>
-                    <ul className="admin-list">{x.alertes.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                    <h4>Photos à demander au client</h4>
+                    <ul className="admin-list">{r1.photos_a_demander.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                  </>
+                )}
+                {r1.alertes.length > 0 && (
+                  <>
+                    <h4>Alertes</h4>
+                    <ul className="admin-list">{r1.alertes.map((p, i) => <li key={i}>{p}</li>)}</ul>
                   </>
                 )}
               </>
             )}
-            {meshy?.glb && (
-              <div className="admin-actions">
-                <button className="cta ghost" disabled={Boolean(busy) || detailsBusy} onClick={checkDetails}>
-                  {busy === "details" ? "Contrôle…" : details ? "Refaire le contrôle" : "Lancer le contrôle"}
-                </button>
-              </div>
-            )}
+            {baseGlb && <div className="admin-actions">{redo("rapport1", rapport1 ? "Refaire le 1er rapport" : "Lancer le 1er rapport", doRapport1)}</div>}
           </>
         )}
 
-        {sel === "logos" && (
+        {sel === "couleurs" && (
           <>
-            {badges.length > 0 && (
-              <>
-                <h4>Badges repérés par Claude</h4>
-                <ul className="admin-list">
-                  {badges.map((b, i) => (
-                    <li key={i}>
-                      <b>{b.detail}</b> : {b.ou}
-                    </li>
-                  ))}
-                </ul>
-              </>
+            {(step.busy || busy === "couleurs") && (
+              <p className="notice">Claude repère chaque matériau du modèle et choisit sa couleur. Le site repeint ensuite le fichier.</p>
             )}
-            {lib && !fichiers.logos ? (
-              <>
-                <p className="notice">
-                  <b>Ajoutés tout seuls depuis la bibliothèque :</b> {lib.label}. Faits par Claude dans Blender, aux bonnes couleurs (chromé en gris
-                  clair mat). Les logos de marque ne sont pas copiés : le monogramme JM les remplace. Claude les pose à l&apos;assemblage, autant de fois
-                  que nécessaire (ex. le « S » de calandre et celui des clignotants).
-                </p>
-                <div className="meshy-io">
-                  <div className="meshy-col">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="meshy-thumb" src={photoSrc(lib.image)} alt="Badges" />
-                  </div>
-                  <span className="meshy-arrow" aria-hidden>→</span>
-                  <div className="meshy-col">
-                    <GlbViewer src={lib.glb} colors />
-                    <p className="sub">
-                      <a className="link" href={lib.glb} download>Télécharger les badges (.glb)</a>
-                    </p>
-                  </div>
+            {step.state === "error" && <p className="notice err">Couleurs impossibles : {step.note}</p>}
+            {baseGlb && (
+              <div className="meshy-io">
+                <div className="meshy-col">
+                  <h4>Modèle de base</h4>
+                  <GlbViewer src={photoSrc(baseGlb)} colors />
                 </div>
-              </>
-            ) : (
-              <p className="notice">
-                Pas de badges en bibliothèque pour cette voiture : Claude prépare l&apos;image dans le chat du projet (badges en relief, bonnes couleurs,
-                sans copier les logos de marque). Dépose-la ici.
-              </p>
+                <span className="meshy-arrow" aria-hidden>→</span>
+                <div className="meshy-col">
+                  <h4>{fichiers.couleurs ? "Repeint dans Blender" : "Repeint par Claude"}</h4>
+                  {couleursGlb ? (
+                    <>
+                      <GlbViewer src={photoSrc(couleursGlb)} colors />
+                      <p className="sub">
+                        <a className="link" href={photoSrc(couleursGlb)} download={`couleurs-${id}.glb`}>Télécharger le .glb</a>
+                      </p>
+                    </>
+                  ) : (
+                    <div className="glb-viewer">
+                      <span>Pas encore repeint.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-            {fichiers.logos && (
-              <a href={photoSrc(fichiers.logos)} target="_blank" rel="noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="meshy-thumb" src={photoSrc(fichiers.logos)} alt="Image des logos" />
-              </a>
+            {c && (
+              <>
+                <p className="admin-resume">{c.resume}</p>
+                <h4>Matériaux repeints</h4>
+                <div className="zone-chips">
+                  {c.materiaux
+                    .filter((m) => m.action === "peindre")
+                    .map((m) => (
+                      <span key={m.id} className="zone-chip">
+                        <i style={{ background: m.couleur }} />
+                        <b>{m.zone}</b> {m.finition} <code>{m.id}</code>
+                      </span>
+                    ))}
+                </div>
+                {c.limites.length > 0 && (
+                  <>
+                    <h4>Impossible juste en changeant les matériaux (à faire dans Blender)</h4>
+                    <ul className="admin-list">{c.limites.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                  </>
+                )}
+              </>
             )}
             <div className="admin-actions">
-              <label className={`cta ghost ${busy ? "off" : ""}`}>
-                {busy === "logos" ? "Envoi…" : fichiers.logos || lib ? "Remplacer par une autre image" : "Déposer l'image des logos"}
-                <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "logos")} />
-              </label>
+              {baseGlb && rapport1?.status === "done" && redo("couleurs", couleurs ? "Refaire les couleurs" : "Lancer les couleurs", doCouleurs)}
+              {glbDrop("couleurs", fichiers.couleurs ? "Remplacer la version Blender" : "Déposer une version refaite dans Blender")}
             </div>
           </>
         )}
 
-        {sel === "assemblage" && (
+        {sel === "rapport2" && (
+          <>
+            {!couleursGlb && <p className="notice">Il faut d&apos;abord la voiture repeinte.</p>}
+            {(step.busy || busy === "rapport2") && <p className="notice">Claude compare la voiture repeinte aux photos, le rapport s&apos;affiche ici tout seul.</p>}
+            {step.state === "error" && <p className="notice err">Rapport impossible : {step.note}</p>}
+            {r2 && (
+              <>
+                <p className="admin-resume">{r2.resume}</p>
+                <p className="notice">
+                  <b>{RESSEMBLANCE[r2.ressemblance]}</b>
+                  {r2.deja_bon.length > 0 && <> · Déjà bon : {r2.deja_bon.join(", ")}</>}
+                </p>
+                <div className="rapport-cols">
+                  <div>
+                    <h4>Réparable dans Blender ({r2.blender.length})</h4>
+                    <div className="admin-diffs">
+                      {r2.blender.map((d, i) => (
+                        <div key={i} className={`admin-diff imp-${d.importance}`}>
+                          <div className="admin-diff-head">
+                            <strong>{d.probleme}</strong>
+                          </div>
+                          <p>{d.correction}</p>
+                          <span className="sub">
+                            {d.ou} · importance {d.importance}
+                          </span>
+                        </div>
+                      ))}
+                      {!r2.blender.length && <p className="notice">Rien à retoucher.</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <h4>Formes 3D à ajouter ({r2.formes_3d.length})</h4>
+                    <div className="admin-diffs">
+                      {r2.formes_3d.map((f, i) => (
+                        <div key={i} className={`admin-diff imp-${f.importance}`}>
+                          <div className="admin-diff-head">
+                            <strong>{f.forme}</strong>
+                            <span className="chip on">{SOURCE[f.source] ?? f.source}</span>
+                          </div>
+                          <p>{f.description}</p>
+                          <span className="sub">
+                            {f.ou} · {f.remplace ? "remplace une pièce" : "s'ajoute"} · importance {f.importance}
+                            {f.recherche && (
+                              <>
+                                {" · "}
+                                <a className="link" href={`https://sketchfab.com/search?q=${encodeURIComponent(f.recherche)}&type=models`} target="_blank" rel="noreferrer">
+                                  chercher « {f.recherche} »
+                                </a>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                      {!r2.formes_3d.length && <p className="notice">Aucune forme à ajouter.</p>}
+                    </div>
+                  </div>
+                </div>
+                {r2.alertes.length > 0 && (
+                  <>
+                    <h4>Alertes</h4>
+                    <ul className="admin-list">{r2.alertes.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                  </>
+                )}
+              </>
+            )}
+            {couleursGlb && <div className="admin-actions">{redo("rapport2", rapport2 ? "Refaire le 2e rapport" : "Lancer le 2e rapport", doRapport2)}</div>}
+          </>
+        )}
+
+        {sel === "retouches" && (
           <>
             <p className="notice">
-              <b>L&apos;assemblage se fait dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Envoie à Claude les fichiers ci-dessous : il pose les
-              logos, met les couleurs, passe les vitres en noir teinté pour qu&apos;on ne voie pas l&apos;intérieur, et te rend la miniature en .glb.
+              <b>Les retouches se font dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Donne à Claude les fichiers ci-dessous et le 2e rapport :
+              il fait les retouches Blender, ajoute les formes 3D, et te rend la miniature en .glb.
             </p>
             <ul className="admin-list">
               <li>
-                Voiture :{" "}
-                {meshy?.glb ? (
-                  <a className="link" href={photoSrc(meshy.glb)} download={`meshy-${id}.glb`}>modèle Meshy</a>
-                ) : (
-                  "pas encore de modèle Meshy (bloc Pièces 3D)"
-                )}
+                Modèle de base :{" "}
+                {baseGlb ? <a className="link" href={photoSrc(baseGlb)} download={`base-${id}.glb`}>base.glb</a> : "pas encore là"}
               </li>
               <li>
-                Badges :{" "}
-                {lib ? (
-                  <a className="link" href={lib.glb} download>badges 3D de la bibliothèque</a>
-                ) : meshyLogos?.glb ? (
-                  <a className="link" href={photoSrc(meshyLogos.glb)} download={`logos-${id}.glb`}>logos Meshy</a>
-                ) : fichiers.logos ? (
-                  <a className="link" href={photoSrc(fichiers.logos)} target="_blank" rel="noreferrer">image des logos</a>
-                ) : (
-                  "pas encore faits (bloc Logos)"
-                )}
+                Voiture repeinte :{" "}
+                {couleursGlb ? <a className="link" href={photoSrc(couleursGlb)} download={`couleurs-${id}.glb`}>couleurs.glb</a> : "pas encore faite"}
               </li>
-              {meshySplit?.glb && (
-                <li>
-                  Voiture découpée :{" "}
-                  <a className="link" href={photoSrc(meshySplit.glb)} download={`pieces-${id}.glb`}>
-                    {meshySplit.parts ? `${meshySplit.parts} pièces` : "modèle découpé"}
-                  </a>
-                </li>
-              )}
-              {x && <li>Liste des détails : bloc Détails manquants</li>}
+              <li>
+                2e rapport :{" "}
+                {r2 ? `${r2.blender.length} retouche(s) Blender, ${r2.formes_3d.length} forme(s) 3D (bloc 2e rapport)` : "pas encore fait"}
+              </li>
+              <li>Commande : <code>{id}</code></li>
             </ul>
-            {fichiers.final ? (
+            {fichiers.final && (
               <>
                 <h4>Miniature terminée</h4>
                 <GlbViewer src={photoSrc(fichiers.final)} colors />
@@ -529,13 +468,8 @@ export default function AdminDemande({ order }: { order: Order }) {
                   <a className="link" href={photoSrc(fichiers.final)} download={`miniature-${id}.glb`}>Télécharger</a>
                 </p>
               </>
-            ) : null}
-            <div className="admin-actions">
-              <label className={`cta ${busy ? "off" : ""}`}>
-                {busy === "final" ? "Envoi…" : fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)"}
-                <input type="file" accept=".glb,model/gltf-binary" hidden disabled={Boolean(busy)} onChange={(e) => pick(e, "final")} />
-              </label>
-            </div>
+            )}
+            <div className="admin-actions">{glbDrop("final", fichiers.final ? "Remplacer la miniature" : "Déposer la miniature (.glb)", true)}</div>
           </>
         )}
 

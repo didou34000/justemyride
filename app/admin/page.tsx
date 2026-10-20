@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Nav from "@/components/Nav";
 import AdminLogin from "@/components/AdminLogin";
 import AdminLogout from "@/components/AdminLogout";
+import AdminPurge from "@/components/AdminPurge";
 import LiveRefresh from "@/components/LiveRefresh";
 import { Flow } from "@/components/Flow";
 import OrderRow, { GUIDE } from "@/components/OrderRow";
@@ -45,9 +46,10 @@ export default async function AdminPage() {
             <OrderRow key={o.id} o={o} href={`/admin/demande/${o.id}`} />
           ))}
         </div>
+        {orders.length > 0 && <AdminPurge orders={orders.map((o) => ({ id: o.id, car: o.demande.car || o.demande.base?.label || "Voiture", email: o.demande.email, date: o.demande.receivedAt ?? "" }))} />}
 
         <h3>Le circuit d&apos;une commande</h3>
-        <p className="sub">Chaque couleur dit qui agit : bleu le client, orange Claude, violet toi, vert Meshy, jaune Blender, gris l&apos;atelier.</p>
+        <p className="sub">Chaque couleur dit qui agit : bleu le client, orange Claude, violet toi, jaune Blender, gris l&apos;atelier.</p>
         <Flow steps={GUIDE} />
       </section>
     </main>
