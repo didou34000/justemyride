@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 import { z } from "zod/v4";
 import { readBytes, readJson } from "@/lib/blobJson";
 import { BLOB_ACCESS } from "@/lib/storage";
@@ -275,6 +276,123 @@ export async function rapport2(id: string, views: string[], glb: string) {
       },
     }
   );
+}
+
+// ——— 7. Troisième rapport : ce qui manque encore, et les pièces à demander à Meshy ———
+
+/** Plafond strict : au maximum 4 pièces Meshy par commande. */
+export const MAX_PIECES = 4;
+
+export const Rapport3 = z.object({
+  resume: z.string().describe("2 phrases : la V2 ressemble-t-elle vraiment à la voiture, et qu'est-ce qui manque surtout."),
+  manques: z.array(
+    z.object({
+      element: z.string().describe("Ce qui manque ou est faux (ex. jantes 5 branches doubles, badge S de calandre, pneus trop fins)."),
+      ou: z.string(),
+      importance: z
+        .enum(["essentiel", "secondaire"])
+        .describe("essentiel = sans ça, on ne reconnaît pas SA voiture ; secondaire = un petit détail qu'on peut laisser (sticker arrière, petit logo).")
+        .catch("secondaire"),
+      solution: z
+        .enum(["meshy", "blender", "decalque", "ignorer"])
+        .describe("meshy = pièce 3D à générer d'après une photo ; blender = réglable sur le modèle ; decalque = impression à plat ; ignorer = pas la peine.")
+        .catch("blender"),
+    })
+  ),
+  meshy: z
+    .array(
+      z.object({
+        piece: z.string().describe("La pièce à faire refaire par Meshy, une seule par ligne (ex. jante avant gauche)."),
+        photo: z.string().describe("Le nom exact de la photo du client où la pièce se voit le mieux, de 3/4 de préférence (ex. avant-gauche)."),
+        cadre: z
+          .object({ x: z.number(), y: z.number(), l: z.number(), h: z.number() })
+          .describe("Le rectangle de la pièce dans cette photo, en fractions de 0 à 1 : x,y = coin haut gauche, l = largeur, h = hauteur. Serre la pièce, sans la couper."),
+        consigne: z.string().describe("Ce que Meshy doit refaire exactement : forme, nombre de branches, détails."),
+      })
+    )
+    .describe(`Les pièces essentielles à générer avec Meshy, ${MAX_PIECES} au maximum, la plus importante d'abord.`),
+});
+export type Rapport3 = z.infer<typeof Rapport3>;
+export type Rapport3Rec = Rec<Rapport3> & { crops?: (string | null)[] };
+
+const SYSTEM4 = `${RULES}
+
+On te montre 4 vues de la V2 de la miniature (le modèle de base repeint puis retouché dans Blender) et les photos de la vraie voiture.
+Ta tâche : vérifier ce qui manque encore (logos, badges, jantes, pneus, aileron, échappement, prises d'air, feux…) et en faire la liste complète.
+Le but : la miniature doit VRAIMENT ressembler à la voiture du client, sans être identique au millimètre. Classe chaque manque :
+- essentiel : sans lui, le client ne reconnaît pas sa voiture (jantes différentes, aileron, kit carrosserie, badge très visible) ;
+- secondaire : un détail qu'on peut laisser tomber (un sticker à l'arrière, un petit logo, une antenne).
+Ensuite, choisis au maximum ${MAX_PIECES} pièces essentielles à faire générer en 3D par Meshy, d'après UNE photo chacune :
+- prends la photo où la pièce se voit le mieux, de 3/4 de préférence (Meshy reconstruit mieux en 3/4) ;
+- donne le rectangle de la pièce dans cette photo : on recadre la photo dessus, car Meshy refait l'objet principal de l'image ;
+- une pièce par ligne ; pour des jantes identiques, une seule jante suffit (on la copiera sur les 4 roues).
+Si rien d'essentiel ne manque, laisse la liste meshy vide.`;
+
+/** Recadre la photo sur la pièce (avec une marge) pour que Meshy ne refasse pas toute la voiture. */
+async function crop(id: string, i: number, pathname: string, c: { x: number; y: number; l: number; h: number }) {
+  const img = sharp((await readBytes(pathname)).data).rotate();
+  const buf = await img.toBuffer({ resolveWithObject: true });
+  const W = buf.info.width;
+  const H = buf.info.height;
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  const pad = 0.15;
+  const x0 = clamp(c.x - c.l * pad);
+  const y0 = clamp(c.y - c.h * pad);
+  const x1 = clamp(c.x + c.l * (1 + pad));
+  const y1 = clamp(c.y + c.h * (1 + pad));
+  const left = Math.round(x0 * W);
+  const top = Math.round(y0 * H);
+  const width = Math.max(16, Math.round((x1 - x0) * W));
+  const height = Math.max(16, Math.round((y1 - y0) * H));
+  const out = await sharp(buf.data)
+    .extract({ left, top, width: Math.min(width, W - left), height: Math.min(height, H - top) })
+    .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  const blob = await put(`submissions/${id}/piece-${i + 1}.jpg`, out, {
+    access: BLOB_ACCESS,
+    contentType: "image/jpeg",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  });
+  return blob.pathname;
+}
+
+export async function rapport3(id: string, views: string[], glb: string) {
+  const demande = await readDemande(id);
+  if (!demande) throw new Error("Demande introuvable");
+  const r2 = await readJson<Rec<Rapport2>>(file(id, "rapport2"));
+  return runClaude(
+    file(id, "rapport3"),
+    {
+      system: SYSTEM4,
+      schema: Rapport3,
+      maxTokens: 16000,
+      content: async () => {
+        const { blocks } = await photoBlocks(demande.files, 16);
+        return [
+          { type: "text", text: `Voiture : ${demande.car || "non précisée"}. V2 : ${glb.split("/").pop()}.` },
+          r2?.result
+            ? { type: "text", text: `Second rapport (avant la V2) :\n${JSON.stringify({ blender: r2.result.blender, formes_3d: r2.result.formes_3d })}` }
+            : { type: "text", text: "Pas de second rapport." },
+          ...views.flatMap((v, i) => imageBlock(v, `Vue ${i + 1} de la V2 :`)),
+          ...blocks,
+          { type: "text", text: "Fais la liste de ce qui manque et choisis les pièces pour Meshy." },
+        ] as Anthropic.ContentBlockParam[];
+      },
+    },
+    async (res) => {
+      res.meshy = res.meshy.slice(0, MAX_PIECES);
+      // Un recadrage raté ne bloque pas le rapport : la pièce reste listée, sans image à envoyer.
+      const crops = await Promise.all(
+        res.meshy.map((m, i) => {
+          const f = demande.files.find((x) => x.slot === m.photo);
+          return f ? crop(id, i, f.pathname, m.cadre).catch(() => null) : Promise.resolve(null);
+        })
+      );
+      return { crops } as Partial<Rapport3Rec>;
+    }
+  ) as Promise<Rapport3Rec>;
 }
 
 /** Lit un .glb de la commande dans le stockage, ou un fichier public du site (voiture du garage). */

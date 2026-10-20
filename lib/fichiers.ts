@@ -5,9 +5,10 @@ import { saveBase } from "@/lib/base";
  * Fichiers déposés par le propriétaire dans une demande :
  * base = un autre modèle de base (.glb) si le téléchargement Sketchfab ne marche pas ;
  * couleurs = la voiture repeinte refaite par Claude dans Blender (remplace celle du site pour le 2e rapport) ;
+ * v2 = la V2 corrigée par Claude dans Blender après le 2e rapport (base du 3e rapport) ;
  * final = la miniature terminée (.glb), à valider avant d'envoyer au client.
  */
-export const FICHIERS = ["base", "couleurs", "final"] as const;
+export const FICHIERS = ["base", "couleurs", "v2", "final"] as const;
 export type FichierKind = (typeof FICHIERS)[number];
 export type Fichiers = Partial<Record<Exclude<FichierKind, "base">, string>>;
 

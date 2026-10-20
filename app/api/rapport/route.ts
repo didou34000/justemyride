@@ -3,14 +3,14 @@ import { isAdmin } from "@/lib/adminAuth";
 import { claudeConfigured, validImages } from "@/lib/claude";
 import { readJson } from "@/lib/blobJson";
 import { readFichiers } from "@/lib/fichiers";
-import { couleurs, glbLoader, rapport1, rapport2, type CouleursRec } from "@/lib/rapports";
+import { couleurs, glbLoader, rapport1, rapport2, rapport3, type CouleursRec } from "@/lib/rapports";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
  * Les passages de Claude sur une commande, avec les images rendues par le navigateur de l'admin.
- * Body : { id, step: "rapport1", views } | { id, step: "couleurs", sheets: [{ id: "m3", image }] } | { id, step: "rapport2", views }.
+ * Body : { id, step: "rapport1", views } | { id, step: "couleurs", sheets: [{ id: "m3", image }] } | { id, step: "rapport2" | "rapport3", views }.
  */
 export async function POST(request: Request) {
   if (!claudeConfigured()) return NextResponse.json({ error: "Claude désactivé (clé ANTHROPIC_API_KEY manquante)" }, { status: 503 });
@@ -37,6 +37,14 @@ export async function POST(request: Request) {
       const glb = (await readFichiers(id)).couleurs ?? (await readJson<CouleursRec>(`submissions/${id}/couleurs.json`))?.glb;
       if (!glb) return NextResponse.json({ error: "Pas encore de voiture repeinte" }, { status: 409 });
       return NextResponse.json({ rec: await rapport2(id, views, glb) });
+    }
+    if (step === "rapport3") {
+      if (!validImages(views, 6)) return NextResponse.json({ error: "Vues invalides" }, { status: 400 });
+      const f = await readFichiers(id);
+      // La V2 de Blender si elle est déposée, sinon la voiture repeinte.
+      const glb = f.v2 ?? f.couleurs ?? (await readJson<CouleursRec>(`submissions/${id}/couleurs.json`))?.glb;
+      if (!glb) return NextResponse.json({ error: "Pas encore de V2 ni de voiture repeinte" }, { status: 409 });
+      return NextResponse.json({ rec: await rapport3(id, views, glb) });
     }
     return NextResponse.json({ error: "Étape inconnue" }, { status: 400 });
   } catch (e) {

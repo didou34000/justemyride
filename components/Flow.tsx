@@ -22,6 +22,9 @@ const ICON: Record<string, ReactNode> = {
   rapport1: <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5M8.5 11h5M11 8.5v5" />,
   couleurs: <path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1.1-1.6-1.1-2.7 0-.9.7-1.5 1.6-1.5H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2zM7.5 12.5h.01M9.5 8h.01M14.5 8h.01" />,
   rapport2: <path d="M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M8.5 12l2 2 4-4M8.5 17.5h7" />,
+  v2: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
+  rapport3: <path d="M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M12 11v4M12 17.5v.01" />,
+  meshy: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" />,
   retouches: <path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 16.5l9 5 9-5" />,
   rendu: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
   accord: <path d="M3 6h18v12H3zM3 10h18M7 15h4" />,
@@ -57,10 +60,10 @@ const Tags = ({ items }: { items: string[] }) => (
 
 /** Ce qu'on voit dans le bloc pour une demande réelle. */
 function Preview({ step, order }: { step: Step; order: Order }) {
-  const { demande, base, rapport1, couleurs, rapport2, fichiers } = order;
+  const { demande, base, rapport1, couleurs, rapport2, rapport3, pieces, fichiers } = order;
   if (step.state === "error") return <span className="node-err">{step.note}</span>;
   if (step.busy)
-    return <span className="node-live">{step.key === "base" ? "Téléchargement du modèle…" : "Claude regarde…"}</span>;
+    return <span className="node-live">{step.key === "base" ? "Téléchargement du modèle…" : step.key === "meshy" ? `Meshy travaille… ${step.note ?? ""}` : "Claude regarde…"}</span>;
   switch (step.key) {
     case "base":
       if (base?.status === "done")
@@ -122,6 +125,37 @@ function Preview({ step, order }: { step: Step; order: Order }) {
           <Tags items={r.formes_3d.map((f) => f.forme)} />
         </>
       );
+    }
+    case "v2":
+      if (fichiers.v2) return <span className="node-ok">V2 déposée</span>;
+      return <span className="node-note">{step.state === "current" ? "À faire : Claude corrige dans le chat." : HELP[step.key]}</span>;
+    case "rapport3": {
+      const r = rapport3?.result;
+      if (!r) return <span className="node-note">Part tout seul quand la V2 est déposée.</span>;
+      const ess = r.manques.filter((m) => m.importance === "essentiel").length;
+      return (
+        <>
+          <span className="node-big">
+            {ess} <small>essentiel{ess > 1 ? "s" : ""}</small> · {r.meshy.length} <small>Meshy</small>
+          </span>
+          <Tags items={r.meshy.map((m) => m.piece)} />
+        </>
+      );
+    }
+    case "meshy": {
+      const done = pieces.jobs.find((j) => j.thumb);
+      if (pieces.jobs.length)
+        return (
+          <>
+            {done?.thumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="node-thumb" src={photoSrc(done.thumb)} alt="Pièce Meshy" loading="lazy" />
+            )}
+            <span className="node-note">{step.note}</span>
+          </>
+        );
+      if (step.state === "skip") return <span className="node-note">Rien d&apos;essentiel à générer.</span>;
+      return <span className="node-note">{rapport3?.result ? "À toi : vérifie les recadrages et lance." : HELP[step.key]}</span>;
     }
     case "retouches":
       if (fichiers.final) return <span className="node-ok">Miniature déposée, à regarder</span>;
