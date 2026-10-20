@@ -21,7 +21,7 @@ export const STEPS: { key: string; label: string; who: string; tone: Tone; help:
   { key: "rapport2", label: "2e rapport", who: "Claude (auto)", tone: "claude", help: "Claude compare la voiture repeinte aux photos : ce qui se répare dans Blender, et la liste des formes 3D à ajouter." },
   { key: "v2", label: "V2 corrigée", who: "Claude + Blender", tone: "blender", help: "Dans le chat du projet, Claude fait les corrections du 2e rapport dans Blender (zones à repeindre, hauteur…). Tu déposes ici la V2." },
   { key: "rapport3", label: "Ce qui manque", who: "Claude (auto)", tone: "claude", help: "Claude compare la V2 aux photos : ce qui manque encore, essentiel ou secondaire, et 4 pièces au plus à faire par Meshy." },
-  { key: "meshy", label: "Pièces Meshy", who: "Toi + Meshy", tone: "meshy", help: "Chaque pièce essentielle est refaite par Meshy d'après la photo recadrée sur elle. Tu vérifies les recadrages et tu lances (payant, 4 max)." },
+  { key: "meshy", label: "Pièces Meshy", who: "Toi + Meshy", tone: "meshy", help: "Pour chaque pièce essentielle, Meshy dessine la pièce seule de 3/4 d'après la photo recadrée, puis la construit en 3D. Tu vérifies les recadrages et tu lances (payant, 4 max)." },
   { key: "retouches", label: "Assemblage final", who: "Claude + Blender", tone: "blender", help: "Dans le chat du projet, Claude pose les pièces Meshy sur la V2. Tu déposes ici la miniature terminée." },
   { key: "rendu", label: "Rendu envoyé", who: "Toi", tone: "toi", help: "Tu envoies les rendus au client pour validation.", manual: "rendu" },
   { key: "accord", label: "Client OK + paiement", who: "Client", tone: "client", help: "Le client valide son rendu et paie.", manual: "accord" },
