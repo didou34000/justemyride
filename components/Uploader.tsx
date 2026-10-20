@@ -8,12 +8,17 @@ import { track } from "@vercel/analytics";
 import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
 
 /*
- * Envoi d'une voiture en 3 étapes : la voiture, les photos (2 obligatoires, puis autant qu'on veut), le contact.
- * Les noms des fichiers (« avant-gauche », « arriere-droite », « photo-N ») sont lus par l'admin, l'analyse et Meshy.
+ * Envoi d'une voiture en 3 étapes : la voiture, les photos (6 vues guidées, puis autant qu'on veut), le contact.
+ * Les noms des fichiers (« avant », « avant-gauche », « gauche », « droite », « arriere-droite », « arriere », « photo-N »)
+ * sont lus par l'admin et par les rapports de Claude.
  */
 const REQUIRED = [
+  { id: "avant", label: "Face avant", tip: "Bien en face, au milieu : la calandre, les phares, le pare-chocs." },
   { id: "avant-gauche", label: "3/4 avant", tip: "À l'angle avant, en diagonale : la face avant et tout un côté." },
-  { id: "arriere-droite", label: "3/4 arrière", tip: "À l'angle arrière opposé : la face arrière et l'autre côté." },
+  { id: "gauche", label: "Côté gauche", tip: "De profil, bien perpendiculaire : on voit la hauteur de caisse et les jantes." },
+  { id: "droite", label: "Côté droit", tip: "L'autre profil, de la même façon." },
+  { id: "arriere-droite", label: "3/4 arrière", tip: "À l'angle arrière, en diagonale : la face arrière et un côté." },
+  { id: "arriere", label: "Face arrière", tip: "Bien en face, au milieu : les feux, l'échappement, le diffuseur." },
 ] as const;
 // Pas de vraie limite pour le client : seulement un garde-fou contre un envoi par erreur de toute une galerie.
 const MAX_EXTRA = 78;
@@ -62,7 +67,7 @@ export default function Uploader({ size }: { size?: string } = {}) {
   const total = REQUIRED.filter((r) => req[r.id]).length + extra.length;
   const emailOk = /^\S+@\S+\.\S+$/.test(email);
 
-  /** Plusieurs photos d'un coup : elles remplissent d'abord les 2 obligatoires (à partir de `first`), puis les photos en plus. */
+  /** Plusieurs photos d'un coup : elles remplissent d'abord les 6 vues (à partir de `first`), puis les photos en plus. */
   function addFiles(list: FileList | File[], first?: ReqId) {
     const files = Array.from(list).filter(isImage);
     if (!files.length) return;
@@ -214,7 +219,7 @@ export default function Uploader({ size }: { size?: string } = {}) {
           </div>
           <h2 className="wz-title">Les photos de ta voiture</h2>
           <p className="wz-tip">
-            Au minimum un 3/4 avant et un 3/4 arrière, puis autant de photos que tu veux : plus il y en a, plus ta miniature est fidèle. Sur ordinateur, glisse-les toutes d'un coup.
+            6 vues autour de la voiture, puis autant de photos en plus que tu veux (jantes, détails modifiés) : plus il y en a, plus ta miniature est fidèle. Sur ordinateur, glisse-les toutes d'un coup.
           </p>
 
           <div className="req-grid">
@@ -248,7 +253,7 @@ export default function Uploader({ size }: { size?: string } = {}) {
           <div className="extra">
             <div className="extra-head">
               <b>Toutes les autres photos{extra.length ? ` (${extra.length})` : ""}</b>
-              <span>Profil, face, arrière, jantes, intérieur, détails modifiés… Mets-en autant que tu veux.</span>
+              <span>Jantes, gros plans des modifs (kit, aileron, autocollants), logos… Mets-en autant que tu veux.</span>
             </div>
             <div className="extra-grid">
               {extra.map((f, i) => (

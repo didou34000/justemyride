@@ -705,7 +705,7 @@ label.cta.off { opacity: .5; pointer-events: none; }
 .photos { position: relative; border-radius: 12px; transition: background .15s; }
 .photos.drag { background: var(--focus-bg); outline: 2px dashed var(--blue); outline-offset: 8px; }
 .photos .wz-tip { margin-bottom: 20px; }
-.req-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.req-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .slot {
   display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-radius: 14px; overflow: hidden;
   cursor: pointer; background: #fff; transition: border-color .15s, box-shadow .15s;

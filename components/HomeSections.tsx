@@ -115,7 +115,7 @@ export function FromPhoto() {
 
 export function HowItWorks() {
   const steps = [
-    ["Tu envoies tes photos", "2 au minimum, au téléphone. Plus tu en mets, plus elle est fidèle."],
+    ["Tu envoies tes photos", "6 vues autour de la voiture, au téléphone. Plus tu en mets, plus elle est fidèle."],
     ["Tu valides ton aperçu 3D", "Gratuit. Tu demandes des retouches si besoin, puis tu choisis la taille et tu commandes."],
     ["On la fabrique et on te l'envoie", `Fabriquée à la commande en ${LEAD_TIME} environ, livrée chez toi.`],
   ];
