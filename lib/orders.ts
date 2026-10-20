@@ -2,7 +2,8 @@ import { del, list } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
 import { claudeConfigured, stale, type Rec } from "@/lib/claude";
 import { readBase, type BaseRecord } from "@/lib/base";
-import type { CouleursRec, Rapport1, Rapport2 } from "@/lib/rapports";
+import type { CouleursRec, Rapport1, Rapport2, Rapport3Rec } from "@/lib/rapports";
+import { readPieces, type Pieces } from "@/lib/meshy";
 import { readFichiers, type Fichiers } from "@/lib/fichiers";
 import type { Base } from "@/lib/catalog";
 import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
@@ -12,7 +13,8 @@ export { MANUAL, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/ste
 /**
  * Suivi des demandes pour le tableau de bord admin.
  * Chaque demande vit dans submissions/<id>/ : demande.json (envoi du client), base.json + base.glb (le modèle Sketchfab),
- * rapport1.json, couleurs.json + couleurs.glb, rapport2.json (les passages de Claude), fichiers.json (fichiers déposés)
+ * rapport1.json, couleurs.json + couleurs.glb, rapport2.json, rapport3.json + piece-N.jpg (les passages de Claude),
+ * meshy-pieces.json + meshy-piece-N.glb (les pièces Meshy), fichiers.json (fichiers déposés : v2, final…)
  * et suivi.json (les étapes cochées à la main par le propriétaire).
  */
 
@@ -33,6 +35,8 @@ export type Order = {
   rapport1: Rec<Rapport1> | null;
   couleurs: CouleursRec | null;
   rapport2: Rec<Rapport2> | null;
+  rapport3: Rapport3Rec | null;
+  pieces: Pieces;
   /** La voiture repeinte qui compte : celle refaite dans Blender si elle a été déposée, sinon celle du site. */
   couleursGlb?: string;
   fichiers: Fichiers;
@@ -53,10 +57,10 @@ function claudeStep(base: Omit<Step, "state">, r: Rec<unknown> | null, done: (r:
 }
 
 export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn = true): Step[] {
-  const { demande: d, base: b, rapport1: r1, couleurs: c, rapport2: r2, fichiers: f, suivi: s } = o;
+  const { demande: d, base: b, rapport1: r1, couleurs: c, rapport2: r2, rapport3: r3, pieces: p, fichiers: f, suivi: s } = o;
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
-    const noKey = !claudeOn && ["rapport1", "couleurs", "rapport2"].includes(def.key);
+    const noKey = !claudeOn && ["rapport1", "couleurs", "rapport2", "rapport3"].includes(def.key);
     switch (def.key) {
       case "base":
         if (!b) return { ...base, state: "todo" };
@@ -76,6 +80,21 @@ export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn
       case "rapport2":
         if (noKey && !r2) return { ...base, state: "error", note: "Clé Claude absente de Vercel." };
         return claudeStep(base, r2, (r) => `${(r as Rec<Rapport2>).result?.formes_3d.length ?? 0} forme(s) 3D`);
+      case "v2":
+        return f.v2 ? { ...base, state: "done", note: "V2 déposée" } : { ...base, state: "todo" };
+      case "rapport3":
+        if (noKey && !r3) return { ...base, state: "error", note: "Clé Claude absente de Vercel." };
+        return claudeStep(base, r3, (r) => `${(r as Rapport3Rec).result?.meshy.length ?? 0} pièce(s) pour Meshy`);
+      case "meshy": {
+        const want = r3?.result?.meshy.length ?? 0;
+        if (r3?.status === "done" && !want) return { ...base, state: "skip", note: "rien d'essentiel à générer" };
+        if (!p.jobs.length) return { ...base, state: "todo" };
+        const failed = p.jobs.filter((j) => ["FAILED", "CANCELED", "error"].includes(j.status));
+        const ok = p.jobs.filter((j) => j.glb).length;
+        if (ok + failed.length < p.jobs.length) return { ...base, state: "current", busy: true, note: `${ok}/${p.jobs.length} prête(s)` };
+        if (failed.length && !ok) return { ...base, state: "error", note: failed[0].error ?? "Échec Meshy" };
+        return { ...base, state: "done", note: `${ok} pièce(s) reçue(s)${failed.length ? `, ${failed.length} en échec` : ""}` };
+      }
       case "retouches":
         return f.final ? { ...base, state: "done", note: "miniature déposée" } : { ...base, state: "todo" };
     }
@@ -91,15 +110,17 @@ export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [base, rapport1, couleurs, rapport2, fichiers, suivi] = await Promise.all([
+  const [base, rapport1, couleurs, rapport2, rapport3, pieces, fichiers, suivi] = await Promise.all([
     readBase(id),
     readJson<Rec<Rapport1>>(`submissions/${id}/rapport1.json`),
     readJson<CouleursRec>(`submissions/${id}/couleurs.json`),
     readJson<Rec<Rapport2>>(`submissions/${id}/rapport2.json`),
+    readJson<Rapport3Rec>(`submissions/${id}/rapport3.json`),
+    readPieces(id),
     readFichiers(id),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
   ]);
-  const o = { demande: { ...demande, id }, base, rapport1, couleurs, rapport2, couleursGlb: fichiers.couleurs ?? couleurs?.glb, fichiers, suivi };
+  const o = { demande: { ...demande, id }, base, rapport1, couleurs, rapport2, rapport3, pieces, couleursGlb: fichiers.couleurs ?? couleurs?.glb, fichiers, suivi };
   const steps = buildSteps(o, claudeConfigured());
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
   return { id, ...o, steps, progress };

@@ -26,6 +26,13 @@ const SOURCE: Record<string, string> = {
   decalque_relief: "Décalque en relief",
 };
 
+const SOLUTION3: Record<string, string> = {
+  meshy: "Meshy",
+  blender: "Blender",
+  decalque: "Décalque",
+  ignorer: "On laisse",
+};
+
 const RESSEMBLANCE: Record<string, string> = {
   tres_proche: "Très proche de la vraie voiture",
   proche: "Proche de la vraie voiture",
@@ -36,16 +43,16 @@ const RESSEMBLANCE: Record<string, string> = {
 const day = (iso?: string) =>
   iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
 
-type Kind = "base" | "couleurs" | "final";
+type Kind = "base" | "couleurs" | "v2" | "final";
 
 /**
  * Page du propriétaire pour une demande : le circuit en blocs, et le détail du bloc choisi.
- * Les étapes 1 à 5 s'enchaînent toutes seules tant que cette page est ouverte : c'est ce navigateur
+ * Les passages de Claude s'enchaînent toutes seules tant que cette page est ouverte : c'est ce navigateur
  * qui rend les vues 3D que Claude regarde (le serveur ne sait pas faire de 3D).
  */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, base, rapport1, couleurs, rapport2, couleursGlb, fichiers, suivi, steps } = order;
+  const { id, demande, base, rapport1, couleurs, rapport2, rapport3, pieces, couleursGlb, fichiers, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "base";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -59,6 +66,13 @@ export default function AdminDemande({ order }: { order: Order }) {
   const r1 = rapport1?.result;
   const c = couleurs?.result;
   const r2 = rapport2?.result;
+  const r3 = rapport3?.result;
+  const v2Glb = fichiers.v2 ?? couleursGlb;
+  const meshyBusy = Boolean(state("meshy")?.busy);
+  const launched = new Set(pieces.jobs.filter((j) => !["FAILED", "CANCELED", "error"].includes(j.status)).map((j) => j.index));
+  // Toutes les pièces recadrées sont cochées d'office ; on décoche celles qu'on ne veut pas.
+  const [unchecked, setUnchecked] = useState<number[]>([]);
+  const chosen = (r3?.meshy ?? []).map((_, i) => i).filter((i) => rapport3?.crops?.[i] && !launched.has(i) && !unchecked.includes(i));
 
   async function post(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -100,6 +114,17 @@ export default function AdminDemande({ order }: { order: Order }) {
       return post("/api/rapport", { id, step: "rapport2", views });
     });
 
+  const doRapport3 = () =>
+    run("rapport3", async () => {
+      if (!v2Glb) throw new Error("Pas encore de V2");
+      const views = await renderViews(photoSrc(v2Glb)).catch((e) => Promise.reject(new Error(`Rendu des vues impossible : ${e.message}`)));
+      return post("/api/rapport", { id, step: "rapport3", views });
+    });
+  const launchMeshy = (list: number[]) => {
+    if (!window.confirm(`Lancer ${list.length} génération(s) Meshy payante(s) ? (4 au maximum par commande)`)) return;
+    run("meshy", () => post("/api/meshy", { id, pieces: list }));
+  };
+
   // L'enchaînement automatique : chaque étape part une fois, seulement si elle n'a jamais été lancée.
   // Après une erreur, rien ne repart tout seul : on relance au bouton.
   const started = useRef(new Set<string>());
@@ -115,7 +140,9 @@ export default function AdminDemande({ order }: { order: Order }) {
     if (!rapport1) return once("rapport1", doRapport1);
     if (rapport1.status !== "done") return;
     if (!couleurs && !fichiers.couleurs) return once("couleurs", doCouleurs);
-    if (couleursGlb && !rapport2 && (fichiers.couleurs || couleurs?.status === "done")) once("rapport2", doRapport2);
+    if (couleursGlb && !rapport2 && (fichiers.couleurs || couleurs?.status === "done")) return once("rapport2", doRapport2);
+    // Le 3e rapport part tout seul seulement quand la V2 de Blender est déposée.
+    if (fichiers.v2 && !rapport3) once("rapport3", doRapport3);
   });
 
   // Dépôt d'un fichier par le propriétaire : envoi direct vers le stockage, puis enregistrement dans la demande.
@@ -171,7 +198,7 @@ export default function AdminDemande({ order }: { order: Order }) {
           </p>
         </div>
         <span className="admin-top-r">
-          <LiveRefresh every={running ? 8 : 30} />
+          <LiveRefresh every={running ? 8 : 30} poll={meshyBusy ? `/api/meshy?id=${id}` : undefined} />
           <button className="link" disabled={Boolean(busy)} onClick={remove}>
             Effacer la demande
           </button>
@@ -438,11 +465,159 @@ export default function AdminDemande({ order }: { order: Order }) {
           </>
         )}
 
+        {sel === "v2" && (
+          <>
+            <p className="notice">
+              <b>La V2 se fait dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Donne à Claude la voiture repeinte et le numéro de commande :
+              il applique les corrections « réparable dans Blender » du 2e rapport et te rend la V2 en .glb. Dès que tu la déposes, le 3e rapport part tout seul.
+            </p>
+            <ul className="admin-list">
+              <li>
+                Voiture repeinte :{" "}
+                {couleursGlb ? <a className="link" href={photoSrc(couleursGlb)} download={`couleurs-${id}.glb`}>couleurs.glb</a> : "pas encore faite"}
+              </li>
+              <li>2e rapport : {r2 ? `${r2.blender.length} correction(s) Blender` : "pas encore fait"}</li>
+              <li>Commande : <code>{id}</code></li>
+            </ul>
+            {fichiers.v2 && (
+              <>
+                <GlbViewer src={photoSrc(fichiers.v2)} colors />
+                <p className="sub">
+                  <a className="link" href={photoSrc(fichiers.v2)} download={`v2-${id}.glb`}>Télécharger la V2</a>
+                </p>
+              </>
+            )}
+            <div className="admin-actions">
+              {glbDrop("v2", fichiers.v2 ? "Remplacer la V2" : "Déposer la V2 (.glb)", true)}
+              {!fichiers.v2 && couleursGlb && !rapport3 && (
+                <button className="link" disabled={Boolean(busy)} onClick={doRapport3}>
+                  Passer la V2 : faire le 3e rapport sur la voiture repeinte
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {sel === "rapport3" && (
+          <>
+            {!v2Glb && <p className="notice">Il faut d&apos;abord la V2.</p>}
+            {(step.busy || busy === "rapport3") && <p className="notice">Claude compare la V2 aux photos, le rapport s&apos;affiche ici tout seul.</p>}
+            {step.state === "error" && <p className="notice err">Rapport impossible : {step.note}</p>}
+            {r3 && (
+              <>
+                <p className="admin-resume">{r3.resume}</p>
+                <div className="rapport-cols">
+                  {(["essentiel", "secondaire"] as const).map((imp) => (
+                    <div key={imp}>
+                      <h4>
+                        {imp === "essentiel" ? "Essentiel" : "Secondaire (on peut laisser)"} ({r3.manques.filter((m) => m.importance === imp).length})
+                      </h4>
+                      <div className="admin-diffs">
+                        {r3.manques
+                          .filter((m) => m.importance === imp)
+                          .map((m, i) => (
+                            <div key={i} className={`admin-diff imp-${imp === "essentiel" ? "haute" : "basse"}`}>
+                              <div className="admin-diff-head">
+                                <strong>{m.element}</strong>
+                                <span className="chip on">{SOLUTION3[m.solution] ?? m.solution}</span>
+                              </div>
+                              <span className="sub">{m.ou}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="sub">Pièces choisies pour Meshy : {r3.meshy.length ? r3.meshy.map((m) => m.piece).join(", ") : "aucune"} (bloc Pièces Meshy).</p>
+              </>
+            )}
+            {v2Glb && <div className="admin-actions">{redo("rapport3", rapport3 ? "Refaire le 3e rapport" : "Lancer le 3e rapport", doRapport3)}</div>}
+          </>
+        )}
+
+        {sel === "meshy" && (
+          <>
+            {!r3 && <p className="notice">Il faut d&apos;abord le 3e rapport.</p>}
+            {r3 && !r3.meshy.length && <p className="notice">Rien d&apos;essentiel à faire générer.</p>}
+            {r3 && r3.meshy.length > 0 && (
+              <>
+                <p className="sub">
+                  Meshy refait l&apos;objet principal de l&apos;image : chaque photo est recadrée sur la pièce. Vérifie les recadrages avant de lancer (payant).{" "}
+                  {pieces.jobs.length}/4 génération(s) utilisée(s) pour cette commande.
+                </p>
+                <div className="pieces">
+                  {r3.meshy.map((m, i) => {
+                    const job = [...pieces.jobs].reverse().find((j) => j.index === i);
+                    const crop = rapport3?.crops?.[i];
+                    const failed = job && ["FAILED", "CANCELED", "error"].includes(job.status);
+                    return (
+                      <div key={i} className="piece">
+                        <div className="meshy-io">
+                          <div className="meshy-col">
+                            {crop ? (
+                              <a href={photoSrc(crop)} target="_blank" rel="noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="meshy-thumb" src={photoSrc(crop)} alt={`Recadrage : ${m.piece}`} />
+                              </a>
+                            ) : (
+                              <p className="notice err">Recadrage impossible (photo « {m.photo} » introuvable).</p>
+                            )}
+                          </div>
+                          <span className="meshy-arrow" aria-hidden>→</span>
+                          <div className="meshy-col">
+                            {job?.glb ? (
+                              <>
+                                <GlbViewer src={photoSrc(job.glb)} />
+                                <p className="sub">
+                                  <a className="link" href={photoSrc(job.glb)} download={`piece-${i + 1}-${id}.glb`}>Télécharger le .glb</a>
+                                </p>
+                              </>
+                            ) : (
+                              <div className="glb-viewer">
+                                <span>
+                                  {!job ? "Pas encore lancée." : failed ? `Échec : ${job.error ?? job.status}` : `Meshy travaille… ${job.progress ?? 0} %`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <label className="piece-head">
+                          {crop && !launched.has(i) && (
+                            <input
+                              type="checkbox"
+                              checked={chosen.includes(i)}
+                              onChange={(e) => setUnchecked((u) => (e.target.checked ? u.filter((x) => x !== i) : [...u, i]))}
+                            />
+                          )}
+                          <b>{m.piece}</b>
+                        </label>
+                        <p className="sub">
+                          {m.consigne} · photo « {m.photo} »
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="admin-actions">
+                  <button
+                    className="cta"
+                    disabled={Boolean(busy) || !chosen.length || pieces.jobs.length >= 4}
+                    onClick={() => launchMeshy(chosen)}
+                  >
+                    {busy === "meshy" ? "Lancement…" : `Lancer Meshy (${chosen.length} pièce(s))`}
+                  </button>
+                  {pieces.jobs.length >= 4 && <span className="sub">Plafond de 4 générations atteint pour cette commande.</span>}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {sel === "retouches" && (
           <>
             <p className="notice">
-              <b>Les retouches se font dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Donne à Claude les fichiers ci-dessous et le 2e rapport :
-              il fait les retouches Blender, ajoute les formes 3D, et te rend la miniature en .glb.
+              <b>L&apos;assemblage se fait dans le chat du projet</b> (Vercel ne fait pas tourner Blender). Donne à Claude la V2 et les pièces Meshy :
+              il les pose, les met à l&apos;échelle et aux bonnes couleurs, et te rend la miniature en .glb.
             </p>
             <ul className="admin-list">
               <li>
@@ -454,8 +629,20 @@ export default function AdminDemande({ order }: { order: Order }) {
                 {couleursGlb ? <a className="link" href={photoSrc(couleursGlb)} download={`couleurs-${id}.glb`}>couleurs.glb</a> : "pas encore faite"}
               </li>
               <li>
-                2e rapport :{" "}
-                {r2 ? `${r2.blender.length} retouche(s) Blender, ${r2.formes_3d.length} forme(s) 3D (bloc 2e rapport)` : "pas encore fait"}
+                V2 : {fichiers.v2 ? <a className="link" href={photoSrc(fichiers.v2)} download={`v2-${id}.glb`}>v2.glb</a> : "pas encore déposée"}
+              </li>
+              <li>
+                Pièces Meshy :{" "}
+                {pieces.jobs.filter((j) => j.glb).length
+                  ? pieces.jobs
+                      .filter((j) => j.glb)
+                      .map((j, k) => (
+                        <span key={j.index}>
+                          {k > 0 && ", "}
+                          <a className="link" href={photoSrc(j.glb!)} download={`piece-${j.index + 1}-${id}.glb`}>{j.piece}</a>
+                        </span>
+                      ))
+                  : "aucune pour l'instant"}
               </li>
               <li>Commande : <code>{id}</code></li>
             </ul>
