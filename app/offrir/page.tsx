@@ -17,7 +17,7 @@ const from = Math.min(...sizes.map((s) => s.price));
 const socle = accessories.find((a) => a.id === "socle")!;
 
 const steps = [
-  ["Prends ses photos en douce", "Un 3/4 avant et un 3/4 arrière au minimum, garée dans la rue ou sur le parking. Plus il y en a, mieux c'est."],
+  ["Prends ses photos en douce", "Les 6 vues autour de la voiture (face, côtés, 3/4, arrière), garée dans la rue ou sur le parking. Plus il y en a, mieux c'est."],
   ["Envoie-les avec ton e-mail", "C'est toi qui reçois l'aperçu 3D, pas la personne à qui tu l'offres. La surprise reste entière."],
   ["Choisis la taille et le socle", `Le socle noir gravé (+${socle.price} €) peut porter un petit texte : un prénom, une date, une plaque.`],
   ["On l'envoie chez toi", `Fabriquée en ${LEAD_TIME} environ. Pense à commander tôt pour une date précise.`],

@@ -114,7 +114,7 @@ export async function rapport1(id: string, views: string[]) {
             `Modèle 3D de base : ${base.label}${base.author ? ` (Sketchfab, par ${base.author})` : ""}.`,
             skipped ? `Le client a envoyé ${demande.files.length} photos ; tu vois les 20 premières.` : "",
             unreadable.length ? `Photos illisibles : ${unreadable.join(", ")}.` : "",
-            "« avant-gauche » et « arriere-droite » sont les 3/4 avant et arrière ; « photo-N » d'autres vues ; « detail-N » des gros plans.",
+            "Les photos guidées : « avant » (face avant), « avant-gauche » (3/4 avant), « gauche » et « droite » (profils), « arriere-droite » (3/4 arrière), « arriere » (face arrière) ; « photo-N » sont des photos en plus (gros plans, jantes, modifs).",
           ]
             .filter(Boolean)
             .join("\n"),

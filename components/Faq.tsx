@@ -15,8 +15,8 @@ export const QUESTIONS: QA[] = [
     q: "Combien de photos faut-il ?",
     a: (
       <>
-        Au minimum 2 : un trois quarts avant et un trois quarts arrière. Il n'y a pas de maximum : profil, face, arrière,
-        jantes, gros plans des modifs (kit, aileron, autocollants)… Plus on en a, plus la miniature est fidèle.
+        6 vues guidées : face avant, trois quarts avant, côté gauche, côté droit, trois quarts arrière et face arrière. Ensuite,
+        pas de maximum : gros plans des modifs (kit, aileron, autocollants)… Plus on en a, plus la miniature est fidèle.
       </>
     ),
   },
