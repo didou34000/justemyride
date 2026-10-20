@@ -27,7 +27,6 @@ export default function About() {
       <Nav />
       <section className="about">
         <div className="about-text">
-          <span className="plate">N°04 · Qui est derrière</span>
           <h1>
             Derrière JustMyRide, il y a <em>{first}</em>.
           </h1>
@@ -49,13 +48,13 @@ export default function About() {
           <span>Fondateur de JustMyRide</span>
           <ul>
             <li>
-              <span className="plate">Statut</span> Micro-entreprise
+              <span className="about-k">Statut</span> Micro-entreprise
             </li>
             <li>
-              <span className="plate">Lieu</span> Montferrier-sur-Lez (34)
+              <span className="about-k">Lieu</span> Montferrier-sur-Lez (34)
             </li>
             <li>
-              <span className="plate">SIREN</span> {SELLER.siren}
+              <span className="about-k">SIREN</span> {SELLER.siren}
             </li>
           </ul>
           <a href={`mailto:${SELLER.email}`} className="cta ghost full">
@@ -65,7 +64,7 @@ export default function About() {
       </section>
 
       <section className="block about-promises" data-reveal>
-        <span className="plate">Mon engagement</span>
+        <h2 className="block-title">Mon engagement</h2>
         <ol>
           {promises.map(([t, d], i) => (
             <li key={t}>
@@ -81,12 +80,10 @@ export default function About() {
       </section>
 
       <section className="final" data-reveal>
-        <h2>
-          Montre-moi <em>ta</em> voiture.
-        </h2>
+        <h2>Montre-moi ta voiture.</h2>
         <p>Quelques photos suffisent pour commencer. L'aperçu 3D est gratuit.</p>
-        <Link href="/envoyer" className="cta">
-          Envoyer mes photos
+        <Link href="/miniature" className="cta">
+          Créer ma miniature
         </Link>
       </section>
       <Footer />

@@ -2,7 +2,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/Reveal";
 import StickyCta from "@/components/StickyCta";
-import { Faq, FinalCta, Hero, HowItWorks, Manifesto, Sizes, Trust } from "@/components/HomeSections";
+import { Faq, FinalCta, FromPhoto, Gift, Hero, HowItWorks, Sizes, TrustStrip } from "@/components/HomeSections";
 import { sizes } from "@/lib/options";
 import JsonLd from "@/components/JsonLd";
 import { SELLER } from "@/lib/legal";
@@ -47,10 +47,11 @@ export default function Home() {
       <JsonLd data={structured} />
       <Nav />
       <Hero />
+      <TrustStrip />
+      <FromPhoto />
       <HowItWorks />
-      <Manifesto />
       <Sizes />
-      <Trust />
+      <Gift />
       <Faq />
       <FinalCta />
       <Footer />

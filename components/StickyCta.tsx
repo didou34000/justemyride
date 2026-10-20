@@ -17,8 +17,8 @@ export default function StickyCta({ from }: { from: number }) {
       <span>
         Dès <b>{from} €</b>
       </span>
-      <Link href="/envoyer" className="cta" tabIndex={hidden ? -1 : 0}>
-        Envoyer mes photos
+      <Link href="/miniature" className="cta" tabIndex={hidden ? -1 : 0}>
+        Créer ma miniature
       </Link>
     </div>
   );

@@ -39,7 +39,7 @@ export default function GaragePage() {
               </Link>
             ))}
         </div>
-        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/envoyer" className="link">Envoie-nous des photos</Link>.</p>
+        <p className="hint">Ta voiture n'est pas dans la liste ? <Link href="/miniature" className="link">Envoie-nous des photos</Link>.</p>
       </section>
       <Footer />
     </main>

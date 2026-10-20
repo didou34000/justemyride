@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import HeroStage from "./HeroStage";
 import { accessories, sizes } from "@/lib/options";
-import { LEAD_TIME, SELLER } from "@/lib/legal";
-import { cars, type Car } from "@/lib/cars";
+import { LEAD_TIME } from "@/lib/legal";
+import { cars } from "@/lib/cars";
+import { FaqContact, FaqList } from "./Faq";
 
 /*
  * Sections de l'accueil. Tout ce qui est affirmé ici doit rester vrai et cohérent avec les CGV
@@ -47,239 +48,198 @@ export function Hero() {
   return (
     <section className="hero night">
       <div className="hero-copy">
-        <span className="plate">Miniature sur mesure · 1:43 à 1:18</span>
         <h1>
           La miniature de <em>ta</em> voiture.
         </h1>
         <p className="lead">
-          Pas un modèle de catalogue : ta voiture, avec ses jantes, sa couleur et ses modifs. Envoie tes photos,
-          valide l'aperçu 3D, on la fabrique en pièce unique.
+          Fabriquée d'après tes photos, avec ses jantes, sa couleur et ses modifs. Tu vois l'aperçu 3D avant de payer.
         </p>
+        <div className="hero-price">
+          Dès <b>{from} €</b> · socle inclus · livraison offerte
+        </div>
         <div className="hero-actions">
-          <Link href="/envoyer" className="cta">
-            Envoyer mes photos
+          <Link href="/miniature" className="cta">
+            Créer ma miniature
           </Link>
           <Link href={`/configurer/${car.slug}`} className="cta ghost">
             Essayer en 3D
           </Link>
         </div>
-        <ul className="hero-facts">
-          <li>
-            <Check /> Dès {from} €
-          </li>
-          <li>
-            <Check /> Aperçu 3D gratuit, sans engagement
-          </li>
-          <li>
-            <Check /> Livraison offerte en France
-          </li>
-        </ul>
       </div>
       <HeroStage car={car} />
     </section>
   );
 }
 
-export function HowItWorks() {
-  const steps: { img: string; alt: string; pos?: string; t: string; d: string }[] = [
-    {
-      img: "/hero/photo.jpg",
-      alt: "Un conducteur photographie sa BMW M140i bleue avec son téléphone",
-      pos: "28% 50%",
-      t: "Tu envoies tes photos",
-      d: "Au minimum un trois quarts avant et un trois quarts arrière, au téléphone. Ajoute-en autant que tu veux : plus il y en a, plus elle est fidèle.",
-    },
-    {
-      img: "/cars/bmw-m140i.jpg",
-      alt: "Aperçu 3D de la même BMW M140i bleue",
-      t: "Tu valides ton aperçu 3D",
-      d: "On recrée ta voiture en 3D et on te l'envoie par e-mail. Tu choisis la taille et les options, puis tu commandes.",
-    },
-    {
-      img: "/shop/v2/socle-blanc.jpg",
-      alt: "Rendu 3D de la miniature de cette BMW M140i sur son socle blanc",
-      t: "On la fabrique pour toi",
-      d: `Fabriquée à la commande en ${LEAD_TIME} environ, puis expédiée chez toi.`,
-    },
-  ];
+/** Une seule ligne de réassurance juste sous le haut de page, comme sur les boutiques en ligne. */
+export function TrustStrip() {
+  const items = ["Pièce unique, faite pour toi", "Aperçu 3D gratuit avant de payer", "Livraison offerte en France", "Paiement sécurisé"];
   return (
-    <section className="block" id="comment" data-reveal>
-      <div className="block-head">
-        <span className="plate">N°01 · Le principe</span>
-        <h2>Comment ça marche</h2>
-        <p>Trois étapes, et tu ne paies qu'à la fin, une fois l'aperçu validé.</p>
+    <ul className="strip" aria-label="Nos engagements">
+      {items.map((i) => (
+        <li key={i}>
+          <Check /> {i}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Tes photos, puis ce que tu reçois. À remplacer par une vraie paire photo de la voiture / photo de la miniature dès qu'elle existe. */
+export function FromPhoto() {
+  return (
+    <section className="block from" data-reveal>
+      <div className="from-pair">
+        <figure>
+          <Image src="/hero/photo.jpg" alt="Un conducteur photographie sa BMW M140i bleue avec son téléphone" width={1672} height={941} sizes="(max-width: 860px) 92vw, 560px" />
+          <figcaption>Tes photos, prises au téléphone</figcaption>
+        </figure>
+        <span className="from-arrow" aria-hidden>
+          →
+        </span>
+        <figure>
+          <Image src="/shop/v2/socle-blanc.jpg" alt="Rendu 3D de la miniature de cette BMW M140i sur son socle blanc" width={1600} height={1600} sizes="(max-width: 860px) 92vw, 560px" />
+          <figcaption>Ta miniature, sur son socle (rendu 3D)</figcaption>
+        </figure>
       </div>
-      <ol className="how">
-        {steps.map((s, i) => (
-          <li key={s.t}>
-            <Image src={s.img} alt={s.alt} width={1200} height={900} sizes="(max-width: 860px) 92vw, 380px" style={s.pos ? { objectPosition: s.pos } : undefined} />
-            <span className="how-n">
-              <i>{i + 1}</i> Étape {i + 1} sur 3
-            </span>
-            <h3>{s.t}</h3>
-            <p>{s.d}</p>
-          </li>
-        ))}
-      </ol>
+      <div className="from-text">
+        <h2>Pas un modèle de catalogue. La tienne.</h2>
+        <p>
+          Les miniatures du commerce existent dans les couleurs d'usine. Ici, on reproduit ta voiture telle qu'elle est :
+          sa teinte, ses jantes, son kit, son aileron, sa hauteur.
+        </p>
+      </div>
     </section>
   );
 }
 
-/** Le manifeste : ce qui fait la différence avec une miniature de série. */
-export function Manifesto() {
-  const items = ["Couleur exacte", "Jantes", "Étriers", "Échappement", "Toit contrasté", "Bandes", "Hauteur", "Vitres teintées", "Chromes noirs", "Plaque gravée"];
+export function HowItWorks() {
+  const steps = [
+    ["Tu envoies tes photos", "2 au minimum, au téléphone. Plus tu en mets, plus elle est fidèle."],
+    ["Tu valides ton aperçu 3D", "Gratuit. Tu demandes des retouches si besoin, puis tu choisis la taille et tu commandes."],
+    ["On la fabrique et on te l'envoie", `Fabriquée à la commande en ${LEAD_TIME} environ, livrée chez toi.`],
+  ];
   return (
-    <section className="band" data-reveal>
-      <div className="band-in">
-        <p className="band-quote">
-          Une miniature de série, c'est la voiture de tout le monde.{" "}
-          <span>
-            Ici, c'est la <em>tienne</em>.
-          </span>
-        </p>
-        <ul className="band-list" aria-label="Ce que tu peux personnaliser">
-          {items.map((i) => (
-            <li key={i}>{i}</li>
-          ))}
-        </ul>
-      </div>
+    <section className="block" id="comment" data-reveal>
+      <h2 className="block-title">Comment ça marche</h2>
+      <ol className="steps">
+        {steps.map(([t, d], i) => (
+          <li key={t}>
+            <i>{i + 1}</i>
+            <div>
+              <h3>{t}</h3>
+              <p>{d}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <Link href="/miniature" className="cta">
+        Créer ma miniature
+      </Link>
     </section>
+  );
+}
+
+/** Les 3 tailles à côté d'une canette de 33 cl (11,5 cm) : « 18 cm » ne parle à personne, une canette si. */
+export function SizeCompare({ active }: { active?: string }) {
+  const CM = 9; // pixels par centimètre dans le dessin
+  const cm = (s: string) => Number(s.replace(/[^\d,]/g, "").replace(",", "."));
+  const H = 12.5 * CM;
+  let x = 10;
+  const items = [
+    { id: "can", w: 6.6 * CM, h: 11.5 * CM, label: "Canette 33 cl" },
+    ...sizes.map((s) => ({ id: s.id, w: cm(s.length) * CM, h: cm(s.length) * CM * 0.33, label: `${s.label} · ${s.length.replace("≈ ", "")}` })),
+  ].map((it) => {
+    const o = { ...it, x };
+    x += it.w + 22;
+    return o;
+  });
+  return (
+    <svg className="size-compare" viewBox={`0 0 ${x} ${H + 30}`} role="img" aria-label="Les trois tailles comparées à une canette de 33 cl">
+      <line x1="0" x2={x} y1={H} y2={H} className="sc-floor" />
+      {items.map((it) =>
+        it.id === "can" ? (
+          <g key={it.id} className="sc-can">
+            <rect x={it.x} y={H - it.h} width={it.w} height={it.h} rx="6" />
+            <text x={it.x + it.w / 2} y={H + 20} textAnchor="middle">
+              {it.label}
+            </text>
+          </g>
+        ) : (
+          <g key={it.id} className={`sc-car ${active === it.id ? "on" : ""}`}>
+            {/* Silhouette de profil : capot, pavillon, coffre, deux roues. */}
+            <path
+              d={`M${it.x} ${H - it.h * 0.25} L${it.x + it.w * 0.02} ${H - it.h * 0.55} L${it.x + it.w * 0.25} ${H - it.h * 0.62} L${it.x + it.w * 0.4} ${H - it.h} L${it.x + it.w * 0.72} ${H - it.h} L${it.x + it.w * 0.88} ${H - it.h * 0.6} L${it.x + it.w} ${H - it.h * 0.52} L${it.x + it.w} ${H - it.h * 0.2} Z`}
+            />
+            <circle cx={it.x + it.w * 0.2} cy={H - it.h * 0.2} r={it.h * 0.2} className="sc-wheel" />
+            <circle cx={it.x + it.w * 0.8} cy={H - it.h * 0.2} r={it.h * 0.2} className="sc-wheel" />
+            <text x={it.x + it.w / 2} y={H + 20} textAnchor="middle">
+              {it.label}
+            </text>
+          </g>
+        ),
+      )}
+    </svg>
   );
 }
 
 export function Sizes() {
-  const extras = [
-    { img: "/shop/v2/socle-noir.jpg", a: accessories.find((a) => a.id === "socle")!, d: "Plaque gravée du texte de ton choix." },
-    { img: "/shop/v2/vitrine.jpg", a: accessories.find((a) => a.id === "vitrine")!, d: "À l'abri de la poussière." },
-  ];
   return (
     <section className="block" id="tailles" data-reveal>
       <div className="block-head">
-        <span className="plate">N°02 · Tarifs</span>
-        <h2>Tailles et prix</h2>
-        <p>Prix tout compris pour la miniature et son socle blanc. Livraison standard offerte en France.</p>
+        <h2>Trois tailles</h2>
+        <p>Socle blanc inclus. Livraison standard offerte en France.</p>
       </div>
+      <SizeCompare active="1-24" />
       <ul className="price-cards">
         {sizes.map((s) => (
           <li key={s.id} className={s.id === "1-24" ? "pick" : ""}>
             {s.id === "1-24" && <span className="tag">Notre conseil</span>}
             <span className="pc-scale">Échelle {s.label}</span>
-            <span className="pc-mini" aria-hidden style={{ width: `${s.id === "1-43" ? 40 : s.id === "1-24" ? 70 : 100}%` }} />
             <span className="pc-price">{s.price} €</span>
             <span className="pc-len">{s.length} de long</span>
           </li>
         ))}
       </ul>
-      <ul className="extras">
-        {extras.map(({ img, a, d }) => (
-          <li key={a.id}>
-            <Image src={img} alt={`Rendu 3D : miniature avec ${a.label.toLowerCase()}`} width={1600} height={1600} sizes="(max-width: 860px) 40vw, 200px" />
-            <div>
-              <b>{a.label}</b>
-              <span>
-                + {a.price} € · {d}
-              </span>
-            </div>
-          </li>
+      <p className="extras-line">
+        En option : {accessories.map((a, i) => (
+          <span key={a.id}>
+            {i > 0 && " · "}
+            {a.label.toLowerCase()} (+{a.price} €)
+          </span>
         ))}
-      </ul>
+      </p>
     </section>
   );
 }
 
-export function Trust() {
-  const items = [
-    ["Refaite ou remboursée", "Abîmée à la livraison ou différente de ta commande : on la refait ou on te rembourse, sans frais."],
-    ["Paiement sécurisé", "Le paiement passe par Shopify. On ne voit jamais tes coordonnées bancaires."],
-    ["Tes photos restent privées", "Elles servent uniquement à modéliser ta voiture. Tu peux demander leur suppression quand tu veux."],
-    ["Vérifiée avant fabrication", "Chaque modèle 3D est contrôlé à la main et validé par toi avant d'être fabriqué."],
-  ];
+export function Gift() {
   return (
-    <section className="block" data-reveal>
-      <ul className="trust">
-        {items.map(([t, d]) => (
-          <li key={t}>
-            <b>{t}</b>
-            <p>{d}</p>
-          </li>
-        ))}
-      </ul>
-      <p className="trust-who">
-        Une vraie personne s'occupe de ta commande. <Link href="/a-propos">Qui est derrière JustMyRide →</Link>
-      </p>
-      <PayLogos />
+    <section className="gift" data-reveal>
+      <Image src="/shop/v2/socle-noir.jpg" alt="Rendu 3D d'une miniature sur socle noir gravé" width={1600} height={1600} sizes="(max-width: 860px) 92vw, 480px" />
+      <div>
+        <h2>Un cadeau que personne n'a déjà</h2>
+        <p>
+          Pour un anniversaire, Noël ou le premier jour avec sa voiture. Prends quelques photos de sa voiture en douce, on
+          s'occupe du reste. Le socle noir peut porter un petit texte gravé.
+        </p>
+        <Link href="/offrir" className="cta dark">
+          Offrir une miniature
+        </Link>
+      </div>
     </section>
   );
 }
 
 export function Faq() {
-  const qa: [string, React.ReactNode][] = [
-    [
-      "Combien de photos faut-il ?",
-      <>
-        Au minimum 2 : un trois quarts avant et un trois quarts arrière. Il n'y a pas de maximum : profil, face, arrière,
-        jantes, gros plans des modifs (kit, aileron, autocollants)… Plus on en a, plus la miniature est fidèle.
-      </>,
-    ],
-    [
-      "Ça m'engage à quelque chose d'envoyer mes photos ?",
-      <>Non. L'envoi et l'aperçu 3D sont gratuits. Tu ne paies que si tu commandes ta miniature.</>,
-    ],
-    [
-      "Combien de temps pour la recevoir ?",
-      <>
-        Chaque miniature est fabriquée à la commande : environ {LEAD_TIME} de fabrication, puis le transport. La
-        livraison standard est offerte en France ; l'express et l'envoi hors de France sont payants, leur prix s'affiche
-        au paiement.
-      </>,
-    ],
-    [
-      "Est-ce que la miniature ressemblera vraiment à l'aperçu 3D ?",
-      <>Oui, c'est le même modèle. De légers écarts de teinte ou de détails sont possibles à petite échelle, surtout en 1:43.</>,
-    ],
-    [
-      "Et si elle arrive abîmée ?",
-      <>Écris-nous avec une photo : on la refait ou on te rembourse, sans frais. Les garanties légales s'appliquent aussi.</>,
-    ],
-    [
-      "Je peux la renvoyer si je change d'avis ?",
-      <>
-        Non : c'est une pièce unique fabriquée sur mesure, le droit de rétractation ne s'applique pas. Prends le temps de
-        bien valider l'aperçu, il est là pour ça.
-      </>,
-    ],
-    [
-      "Que deviennent mes photos ?",
-      <>
-        Elles sont stockées dans un espace privé et servent uniquement à modéliser ta voiture. Tu peux demander leur
-        suppression à tout moment. Détails dans la <Link href="/confidentialite">politique de confidentialité</Link>.
-      </>,
-    ],
-    [
-      "Comment je paie ?",
-      <>
-        Sur la page de paiement sécurisée de Shopify : carte bancaire, PayPal, Klarna ou Shop Pay, et Apple Pay sur
-        iPhone, iPad et Mac.
-      </>,
-    ],
-  ];
   return (
     <section className="block faq" id="faq" data-reveal>
-      <div className="block-head">
-        <span className="plate">N°03 · Questions</span>
-        <h2>Questions fréquentes</h2>
-      </div>
-      <div className="faq-list">
-        {qa.map(([q, a]) => (
-          <details key={q}>
-            <summary>{q}</summary>
-            <p>{a}</p>
-          </details>
-        ))}
-      </div>
-      <p className="faq-contact">
-        Une autre question ? Écris-nous à <a href={`mailto:${SELLER.email}`}>{SELLER.email}</a>
+      <h2 className="block-title">Questions fréquentes</h2>
+      <FaqList ids={["photos", "engagement", "delai", "fidele"]} />
+      <p className="faq-more">
+        <Link href="/faq">Toutes les questions →</Link>
       </p>
+      <FaqContact />
     </section>
   );
 }
@@ -287,12 +247,10 @@ export function Faq() {
 export function FinalCta() {
   return (
     <section className="final" data-reveal>
-      <h2>
-        <em>Ta</em> voiture mérite sa miniature.
-      </h2>
-      <p>Quelques photos, quelques minutes, et on s'occupe du reste.</p>
-      <Link href="/envoyer" className="cta">
-        Envoyer mes photos
+      <h2>Ta voiture mérite sa miniature.</h2>
+      <p>Quelques photos, deux minutes, et l'aperçu 3D est gratuit.</p>
+      <Link href="/miniature" className="cta">
+        Créer ma miniature
       </Link>
     </section>
   );
