@@ -9,6 +9,10 @@ export type StepState = "done" | "current" | "todo" | "error" | "skip";
 /** busy : une machine travaille vraiment dessus (téléchargement, Claude), pas seulement « à faire ». */
 export type Step = { key: string; label: string; who: string; state: StepState; date?: string; note?: string; busy?: boolean };
 
+/** Contrôle final : la miniature part au client seulement au-dessus du seuil ; la boucle s'arrête après maxEssais. */
+export const CONTROLE = { seuil: 89, maxEssais: 5 } as const;
+export const controleOk = (score: number) => score > CONTROLE.seuil;
+
 /** Couleur du bloc selon qui agit (client, Claude, toi, Blender, atelier). */
 export type Tone = "client" | "claude" | "toi" | "blender" | "meshy" | "atelier";
 
@@ -23,7 +27,8 @@ export const STEPS: { key: string; label: string; who: string; tone: Tone; help:
   { key: "rapport3", label: "Ce qui manque", who: "Claude (auto)", tone: "claude", help: "Claude compare la V2 aux photos : ce qui manque encore, essentiel ou secondaire, et 4 pièces au plus à faire par Meshy." },
   { key: "meshy", label: "Pièces Meshy", who: "Toi + Meshy", tone: "meshy", help: "Pour chaque pièce essentielle, Meshy dessine la pièce seule de 3/4 d'après la photo recadrée, puis la construit en 3D. Tu vérifies les recadrages et tu lances (payant, 4 max)." },
   { key: "retouches", label: "Assemblage final", who: "Claude + Blender", tone: "blender", help: "Dans le chat du projet, Claude pose les pièces Meshy sur la V2. Tu déposes ici la miniature terminée." },
-  { key: "rendu", label: "Rendu envoyé", who: "Toi", tone: "toi", help: "Tu envoies les rendus au client pour validation.", manual: "rendu" },
+  { key: "controle", label: "Contrôle ressemblance", who: "Claude (auto)", tone: "claude", help: `Claude compare la miniature terminée aux photos et donne un score de ressemblance. Plus de ${CONTROLE.seuil} % : validée. Sinon, rien ne part : Claude liste ce qui ne va pas, le corrige dans le chat, tu redéposes la miniature et le contrôle repart (${CONTROLE.maxEssais} essais au plus).` },
+  { key: "rendu", label: "Rendu envoyé", who: "Toi", tone: "toi", help: "Tu envoies les rendus au client pour validation, seulement après un contrôle validé.", manual: "rendu" },
   { key: "accord", label: "Client OK + paiement", who: "Client", tone: "client", help: "Le client valide son rendu et paie.", manual: "accord" },
   { key: "impression", label: "Impression", who: "Atelier", tone: "atelier", help: "Fichier envoyé à l'impression, peinture, finitions.", manual: "impression" },
   { key: "expedie", label: "Expédiée", who: "Toi", tone: "toi", help: "Colis parti chez le client.", manual: "expedie" },

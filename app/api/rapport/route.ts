@@ -3,19 +3,22 @@ import { isAdmin } from "@/lib/adminAuth";
 import { claudeConfigured, validImages } from "@/lib/claude";
 import { readJson } from "@/lib/blobJson";
 import { readFichiers } from "@/lib/fichiers";
-import { couleurs, glbLoader, rapport1, rapport2, rapport3, type CouleursRec } from "@/lib/rapports";
+import { controle, couleurs, glbLoader, rapport1, rapport2, rapport3, readEssais, type CouleursRec } from "@/lib/rapports";
+import { readPieces } from "@/lib/meshy";
+import { jobKind, MAX_3D } from "@/lib/meshyShared";
+import { CONTROLE } from "@/lib/steps";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
  * Les passages de Claude sur une commande, avec les images rendues par le navigateur de l'admin.
- * Body : { id, step: "rapport1", views } | { id, step: "couleurs", sheets: [{ id: "m3", image }] } | { id, step: "rapport2" | "rapport3", views }.
+ * Body : { id, step: "rapport1", views } | { id, step: "couleurs", sheets: [{ id: "m3", image }] } | { id, step: "rapport2" | "rapport3" | "controle", views }.
  */
 export async function POST(request: Request) {
   if (!claudeConfigured()) return NextResponse.json({ error: "Claude désactivé (clé ANTHROPIC_API_KEY manquante)" }, { status: 503 });
   if (!isAdmin(request)) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
-  const { id, step, views, sheets } = await request.json().catch(() => ({}));
+  const { id, step, views, sheets, force } = await request.json().catch(() => ({}));
   if (typeof id !== "string" || !/^[\w-]{6,40}$/.test(id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   try {
     if (step === "rapport1") {
@@ -45,6 +48,18 @@ export async function POST(request: Request) {
       const glb = f.v2 ?? f.couleurs ?? (await readJson<CouleursRec>(`submissions/${id}/couleurs.json`))?.glb;
       if (!glb) return NextResponse.json({ error: "Pas encore de V2 ni de voiture repeinte" }, { status: 409 });
       return NextResponse.json({ rec: await rapport3(id, views, glb) });
+    }
+    if (step === "controle") {
+      if (!validImages(views, 6)) return NextResponse.json({ error: "Vues invalides" }, { status: 400 });
+      const glb = (await readFichiers(id)).final;
+      if (!glb) return NextResponse.json({ error: "Pas encore de miniature terminée" }, { status: 409 });
+      // La boucle s'arrête : au-delà de maxEssais, c'est au propriétaire de décider (relance possible avec force).
+      const essais = await readEssais(id);
+      if (essais.length >= CONTROLE.maxEssais && force !== true)
+        return NextResponse.json({ error: `${CONTROLE.maxEssais} contrôles déjà faits : à toi de décider` }, { status: 409 });
+      const pieces = await readPieces(id);
+      const restant = Math.max(0, MAX_3D - pieces.jobs.filter((j) => jobKind(j) === "3d").length);
+      return NextResponse.json({ rec: await controle(id, views, glb, restant) });
     }
     return NextResponse.json({ error: "Étape inconnue" }, { status: 400 });
   } catch (e) {

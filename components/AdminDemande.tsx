@@ -10,7 +10,7 @@ import GlbViewer from "./GlbViewer";
 import MeshyPieces from "./MeshyPieces";
 import { retained3d } from "@/lib/meshyShared";
 import { renderHighlights, renderViews } from "./renderViews";
-import { STEPS } from "@/lib/steps";
+import { CONTROLE, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 
 const TRAITEMENT: Record<string, string> = {
@@ -26,6 +26,9 @@ const SOURCE: Record<string, string> = {
   a_modeliser: "À modéliser",
   decalque_relief: "Décalque en relief",
 };
+
+const GRAVITE: Record<string, string> = { bloquant: "Bloquant", a_corriger: "À corriger", detail: "Détail (on peut laisser)" };
+const CORRECTION: Record<string, string> = { blender: "Blender", couleur: "Couleur", meshy: "Meshy", decalque: "Décalque" };
 
 const SOLUTION3: Record<string, string> = {
   meshy: "Meshy",
@@ -53,7 +56,7 @@ type Kind = "base" | "couleurs" | "v2" | "final";
  */
 export default function AdminDemande({ order }: { order: Order }) {
   const router = useRouter();
-  const { id, demande, base, rapport1, couleurs, rapport2, rapport3, pieces, couleursGlb, fichiers, suivi, steps } = order;
+  const { id, demande, base, rapport1, couleurs, rapport2, rapport3, pieces, controle, essais, couleursGlb, fichiers, suivi, steps } = order;
   const first = steps.find((s) => s.state === "error" || s.state === "current")?.key ?? "base";
   const [sel, setSel] = useState(first);
   const [busy, setBusy] = useState("");
@@ -118,6 +121,17 @@ export default function AdminDemande({ order }: { order: Order }) {
       return post("/api/rapport", { id, step: "rapport3", views });
     });
 
+  // Contrôle final : vues de la miniature terminée, notées par Claude (force : au-delà du nombre d'essais prévu).
+  const doControle = (force = false) =>
+    run("controle", async () => {
+      if (!fichiers.final) throw new Error("Pas encore de miniature terminée");
+      const views = await renderViews(photoSrc(fichiers.final)).catch((e) => Promise.reject(new Error(`Rendu des vues impossible : ${e.message}`)));
+      return post("/api/rapport", { id, step: "controle", views, force });
+    });
+  const lastEssai = essais.at(-1);
+  const controleValide = Boolean(lastEssai?.valide && lastEssai.glb === fichiers.final);
+  const essaisFinis = essais.length >= CONTROLE.maxEssais;
+
   // L'enchaînement automatique : chaque étape part une fois, seulement si elle n'a jamais été lancée.
   // Après une erreur, rien ne repart tout seul : on relance au bouton.
   const started = useRef(new Set<string>());
@@ -135,7 +149,10 @@ export default function AdminDemande({ order }: { order: Order }) {
     if (!couleurs && !fichiers.couleurs) return once("couleurs", doCouleurs);
     if (couleursGlb && !rapport2 && (fichiers.couleurs || couleurs?.status === "done")) return once("rapport2", doRapport2);
     // Le 3e rapport part tout seul seulement quand la V2 de Blender est déposée.
-    if (fichiers.v2 && !rapport3) once("rapport3", doRapport3);
+    if (fichiers.v2 && !rapport3) return once("rapport3", doRapport3);
+    // Chaque nouvelle miniature déposée est contrôlée une fois, jusqu'à maxEssais (la boucle s'arrête là).
+    const fresh = fichiers.final && !essais.some((e) => e.glb === fichiers.final);
+    if (fresh && !essaisFinis && (!controle || controle.status === "done")) once(`controle:${fichiers.final}`, () => doControle());
   });
 
   // Dépôt d'un fichier par le propriétaire : envoi direct vers le stockage, puis enregistrement dans la demande.
@@ -582,6 +599,69 @@ export default function AdminDemande({ order }: { order: Order }) {
           </>
         )}
 
+        {sel === "controle" && (
+          <>
+            {!fichiers.final && <p className="notice">Il faut d&apos;abord déposer la miniature terminée (étape Assemblage final).</p>}
+            {(step.busy || busy === "controle") && <p className="notice">Claude compare la miniature aux photos, le score s&apos;affiche ici tout seul.</p>}
+            {controle?.status === "error" && <p className="notice err">Contrôle impossible : {controle.error}</p>}
+            {controle?.result && lastEssai && (
+              <>
+                <p className={`controle-score ${lastEssai.valide ? "ok" : "ko"}`}>
+                  <b>{controle.result.score} %</b> de ressemblance{" "}
+                  {lastEssai.valide ? "· validée, tu peux envoyer le rendu" : `· pas assez (il faut plus de ${CONTROLE.seuil} %) : rien ne part`}
+                </p>
+                {lastEssai.glb !== fichiers.final && <p className="notice">Une nouvelle miniature a été déposée depuis ce contrôle.</p>}
+                <p className="admin-resume">{controle.result.resume}</p>
+                {controle.result.points_ok.length > 0 && <p className="sub">Réussi : {controle.result.points_ok.join(" · ")}</p>}
+                {(["bloquant", "a_corriger", "detail"] as const).map((g) => {
+                  const list = controle.result!.ecarts.filter((e) => e.gravite === g);
+                  if (!list.length) return null;
+                  return (
+                    <div key={g}>
+                      <h4>
+                        {GRAVITE[g]} ({list.length})
+                      </h4>
+                      <div className="admin-diffs">
+                        {list.map((e, i) => (
+                          <div key={i} className={`admin-diff imp-${g === "bloquant" ? "haute" : g === "a_corriger" ? "moyenne" : "basse"}`}>
+                            <div className="admin-diff-head">
+                              <strong>{e.element}</strong>
+                              <span className="chip on">{CORRECTION[e.correction] ?? e.correction}</span>
+                            </div>
+                            <span className="sub">{e.ou}</span>
+                            <span>{e.consigne}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!lastEssai.valide && !essaisFinis && (
+                  <p className="notice">
+                    <b>La boucle :</b> donne ce contrôle à Claude dans le chat du projet avec la commande <code>{id}</code>. Il corrige la miniature dans Blender,
+                    tu la redéposes à l&apos;étape Assemblage final, et le contrôle repart tout seul (essai {essais.length}/{CONTROLE.maxEssais}).
+                  </p>
+                )}
+                {!lastEssai.valide && essaisFinis && (
+                  <p className="notice err">
+                    {CONTROLE.maxEssais} essais sans dépasser {CONTROLE.seuil} % : la boucle s&apos;arrête. À toi de décider : envoyer quand même, ou corriger encore et relancer à la main.
+                  </p>
+                )}
+              </>
+            )}
+            {essais.length > 0 && (
+              <p className="sub">
+                Essais : {essais.map((e, i) => `n° ${i + 1} ${e.score} %${e.valide ? " ✓" : ""}`).join(" · ")}
+              </p>
+            )}
+            {fichiers.final && (
+              <div className="admin-actions">
+                {redo("controle", essaisFinis ? "Relancer le contrôle quand même" : controle ? "Refaire le contrôle" : "Lancer le contrôle", () => doControle(essaisFinis))}
+              </div>
+            )}
+          </>
+        )}
+
         {def.manual && (
           <div className="admin-actions">
             {suivi[def.manual] ? (
@@ -592,9 +672,21 @@ export default function AdminDemande({ order }: { order: Order }) {
                 </button>
               </>
             ) : (
-              <button className="cta" disabled={Boolean(busy)} onClick={() => call(sel, "/api/admin/suivi", { id, step: def.manual, done: true })}>
-                {busy === sel ? "…" : "C'est fait"}
-              </button>
+              <>
+                {/* Le rendu ne part au client qu'après un contrôle validé ; après tous les essais, c'est au propriétaire de trancher. */}
+                {def.manual === "rendu" && !controleValide && (
+                  <span className="notice err">
+                    {essaisFinis ? "Contrôle non validé : tu peux envoyer quand même, en connaissance de cause." : `Bloqué : le contrôle de ressemblance doit dépasser ${CONTROLE.seuil} %.`}
+                  </span>
+                )}
+                <button
+                  className="cta"
+                  disabled={Boolean(busy) || (def.manual === "rendu" && !controleValide && !essaisFinis)}
+                  onClick={() => call(sel, "/api/admin/suivi", { id, step: def.manual, done: true })}
+                >
+                  {busy === sel ? "…" : def.manual === "rendu" && !controleValide && essaisFinis ? "Envoyer quand même" : "C'est fait"}
+                </button>
+              </>
             )}
           </div>
         )}

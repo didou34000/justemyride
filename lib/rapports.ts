@@ -2,7 +2,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { putFile } from "@/lib/store";
 import sharp from "sharp";
 import { z } from "zod/v4";
-import { readBytes, readJson } from "@/lib/blobJson";
+import { readBytes, readJson, writeJson } from "@/lib/blobJson";
+import { CONTROLE, controleOk } from "@/lib/steps";
 import { imageBlock, photoBlocks, readDemande, runClaude, type Rec } from "@/lib/claude";
 import { readBase } from "@/lib/base";
 import { compressGlb, FINITIONS, materialTable, readGlb, repaint, writeGlb, type Finition, type MatInfo } from "@/lib/glb";
@@ -11,7 +12,8 @@ import { compressGlb, FINITIONS, materialTable, readGlb, repaint, writeGlb, type
  * Les trois passages de Claude, dans l'ordre :
  * 3. 1er rapport : ce qui diffère entre le modèle de base et la vraie voiture ;
  * 4. couleurs : une couleur et une finition par matériau du modèle, appliquées sans toucher à la forme ;
- * 5. 2e rapport : ce qui ne va pas encore, séparé en « réparable dans Blender » et « formes 3D à ajouter ».
+ * 5. 2e rapport : ce qui ne va pas encore, séparé en « réparable dans Blender » et « formes 3D à ajouter » ;
+ * (7. 3e rapport : ce qui manque à la V2 ; 9. contrôle final : score de ressemblance de la miniature terminée.)
  * Les vues du modèle sont rendues par le navigateur de l'admin (Vercel ne fait pas de rendu 3D) puis envoyées ici.
  */
 
@@ -395,4 +397,82 @@ export function glbLoader(origin: string, cookie: string | null) {
     if (!res.ok) throw new Error(`Modèle du garage illisible (${res.status})`);
     return new Uint8Array(await res.arrayBuffer());
   };
+}
+
+// ——— 9. Contrôle final : la miniature terminée ressemble-t-elle assez à la voiture ? ———
+
+export const Controle = z.object({
+  score: z.number().describe("Ressemblance globale de la miniature avec la vraie voiture, de 0 à 100 (barème dans les consignes)."),
+  resume: z.string().describe("2 phrases : le client reconnaîtra-t-il sa voiture, et qu'est-ce qui coince surtout."),
+  points_ok: z.array(z.string()).describe("Ce qui est bien réussi (court)."),
+  ecarts: z.array(
+    z.object({
+      element: z.string().describe("Ce qui ne va pas (ex. jantes trop fines, aileron absent, rouge trop clair)."),
+      ou: z.string(),
+      gravite: z
+        .enum(["bloquant", "a_corriger", "detail"])
+        .describe("bloquant = le client ne reconnaît pas sa voiture à cause de ça ; a_corriger = ça se voit ; detail = on peut laisser.")
+        .catch("a_corriger"),
+      correction: z
+        .enum(["blender", "couleur", "meshy", "decalque"])
+        .describe("blender = retouche du modèle ; couleur = repeindre ; meshy = pièce 3D à refaire (seulement s'il en reste) ; decalque = impression à plat.")
+        .catch("blender"),
+      consigne: z.string().describe("Ce qu'il faut faire précisément pour corriger, utilisable tel quel dans Blender."),
+    })
+  ),
+});
+export type Controle = z.infer<typeof Controle>;
+export type ControleRec = Rec<Controle>;
+/** Un essai du contrôle (gardé à part : le passage en cours réécrit controle.json). */
+export type ControleEssai = { at: string; glb: string; score: number; valide: boolean; resume: string };
+
+const SYSTEM9 = `${RULES}
+
+On te montre 4 vues de la miniature TERMINÉE (modèle repeint, retouché dans Blender, pièces Meshy posées) et les photos de la vraie voiture.
+C'est le contrôle avant d'envoyer le rendu au client. Donne un score de ressemblance de 0 à 100, honnête et sévère, avec ce barème :
+- silhouette et proportions (hauteur de caisse, carrosserie, volumes) : 30 points ;
+- couleurs et finitions de chaque zone : 20 points ;
+- roues (jantes, pneus, taille, position) : 20 points ;
+- éléments distinctifs (aileron, kit, prises d'air, échappement, feux, badges visibles) : 20 points ;
+- détails (rétros, bandes, petits éléments) : 10 points.
+Plus de ${CONTROLE.seuil} seulement si le client reconnaît SA voiture au premier coup d'œil et qu'il ne reste rien de bloquant. Ne gonfle pas le score : un humain s'en sert pour décider d'envoyer ou non.
+Si le score ne dépasse pas ${CONTROLE.seuil}, liste TOUS les écarts, du plus grave au moins grave, chacun avec une consigne de correction précise.
+Si un contrôle précédent t'est donné, vérifie d'abord si ses écarts ont été corrigés, et reste cohérent dans ta notation.`;
+
+const essaisPath = (id: string) => file(id, "controle-essais");
+export const readEssais = async (id: string) => (await readJson<ControleEssai[]>(essaisPath(id))) ?? [];
+
+export async function controle(id: string, views: string[], glb: string, meshyRestant: number) {
+  const demande = await readDemande(id);
+  if (!demande) throw new Error("Demande introuvable");
+  const essais = await readEssais(id);
+  const prev = await readJson<ControleRec>(file(id, "controle"));
+  return runClaude(
+    file(id, "controle"),
+    {
+      system: SYSTEM9,
+      schema: Controle,
+      maxTokens: 16000,
+      content: async () => {
+        const { blocks } = await photoBlocks(demande.files, 16);
+        return [
+          { type: "text", text: `Voiture : ${demande.car || "non précisée"}. Essai n° ${essais.length + 1}. Générations Meshy encore possibles pour cette commande : ${meshyRestant}${meshyRestant ? "" : " (ne propose pas de correction meshy)"}.` },
+          prev?.result
+            ? { type: "text", text: `Contrôle précédent (${prev.result.score} %) :\n${JSON.stringify(prev.result.ecarts)}` }
+            : { type: "text", text: "Premier contrôle." },
+          ...views.flatMap((v, i) => imageBlock(v, `Vue ${i + 1} de la miniature terminée :`)),
+          ...blocks,
+          { type: "text", text: "Donne le score de ressemblance et la liste des écarts." },
+        ] as Anthropic.ContentBlockParam[];
+      },
+    },
+    async (res) => {
+      res.score = Math.max(0, Math.min(100, Math.round(res.score)));
+      await writeJson(essaisPath(id), [
+        ...essais,
+        { at: new Date().toISOString(), glb, score: res.score, valide: controleOk(res.score), resume: res.resume },
+      ]);
+      return { glb } as Partial<ControleRec>;
+    }
+  ) as Promise<ControleRec>;
 }

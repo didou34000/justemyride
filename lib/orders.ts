@@ -2,12 +2,12 @@ import { deletePrefix, listFiles } from "@/lib/store";
 import { readJson, writeJson } from "@/lib/blobJson";
 import { claudeConfigured, stale, type Rec } from "@/lib/claude";
 import { readBase, type BaseRecord } from "@/lib/base";
-import type { CouleursRec, Rapport1, Rapport2, Rapport3Rec } from "@/lib/rapports";
+import { readEssais, type ControleEssai, type ControleRec, type CouleursRec, type Rapport1, type Rapport2, type Rapport3Rec } from "@/lib/rapports";
 import { readPieces, type Pieces } from "@/lib/meshy";
 import { jobFailed, piecesRunning, retained3d } from "@/lib/meshyShared";
 import { readFichiers, type Fichiers } from "@/lib/fichiers";
 import type { Base } from "@/lib/catalog";
-import { STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
+import { CONTROLE, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
 export { MANUAL, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
@@ -40,6 +40,9 @@ export type Order = {
   rapport2: Rec<Rapport2> | null;
   rapport3: Rapport3Rec | null;
   pieces: Pieces;
+  /** Contrôle final de la miniature terminée, et tous ses essais (score par essai). */
+  controle: ControleRec | null;
+  essais: ControleEssai[];
   /** La voiture repeinte qui compte : celle refaite dans Blender si elle a été déposée, sinon celle du site. */
   couleursGlb?: string;
   fichiers: Fichiers;
@@ -60,10 +63,10 @@ function claudeStep(base: Omit<Step, "state">, r: Rec<unknown> | null, done: (r:
 }
 
 export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn = true): Step[] {
-  const { demande: d, base: b, rapport1: r1, couleurs: c, rapport2: r2, rapport3: r3, pieces: p, fichiers: f, suivi: s } = o;
+  const { demande: d, base: b, rapport1: r1, couleurs: c, rapport2: r2, rapport3: r3, pieces: p, fichiers: f, suivi: s, controle: k, essais } = o;
   const steps: Step[] = STEPS.map((def) => {
     const base = { key: def.key, label: def.label, who: def.who };
-    const noKey = !claudeOn && ["rapport1", "couleurs", "rapport2", "rapport3"].includes(def.key);
+    const noKey = !claudeOn && ["rapport1", "couleurs", "rapport2", "rapport3", "controle"].includes(def.key);
     switch (def.key) {
       case "base":
         if (!b) return { ...base, state: "todo" };
@@ -101,6 +104,19 @@ export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn
       }
       case "retouches":
         return f.final ? { ...base, state: "done", note: "miniature déposée" } : { ...base, state: "todo" };
+      case "controle": {
+        if (!f.final) return { ...base, state: "todo" };
+        if (noKey && !k) return { ...base, state: "error", note: "Clé Claude absente de Vercel." };
+        const last = essais.at(-1);
+        if (k?.status === "running" || k?.status === "error" || !last) return claudeStep(base, k, () => "");
+        if (last.glb !== f.final) {
+          if (essais.length >= CONTROLE.maxEssais) return { ...base, state: "error", note: `${CONTROLE.maxEssais} essais faits : à toi de décider` };
+          return { ...base, state: "todo", note: "nouvelle miniature à contrôler" };
+        }
+        if (last.valide) return { ...base, state: "done", date: last.at, note: `${last.score} % : validée` };
+        const fin = essais.length >= CONTROLE.maxEssais ? ` : ${CONTROLE.maxEssais} essais, à toi de décider` : ` : à corriger (essai ${essais.length}/${CONTROLE.maxEssais})`;
+        return { ...base, state: "error", date: last.at, note: `${last.score} %${fin}` };
+      }
     }
     const date = def.manual ? s[def.manual] : undefined;
     return { ...base, state: date ? "done" : "todo", date };
@@ -114,7 +130,7 @@ export function buildSteps(o: Omit<Order, "steps" | "progress" | "id">, claudeOn
 export async function getOrder(id: string): Promise<Order | null> {
   const demande = await readJson<Demande>(`submissions/${id}/demande.json`);
   if (!demande) return null;
-  const [base, rapport1, couleurs, rapport2, rapport3, pieces, fichiers, suivi] = await Promise.all([
+  const [base, rapport1, couleurs, rapport2, rapport3, pieces, fichiers, suivi, controle, essais] = await Promise.all([
     readBase(id),
     readJson<Rec<Rapport1>>(`submissions/${id}/rapport1.json`),
     readJson<CouleursRec>(`submissions/${id}/couleurs.json`),
@@ -123,8 +139,10 @@ export async function getOrder(id: string): Promise<Order | null> {
     readPieces(id),
     readFichiers(id),
     readJson<Suivi>(suiviPath(id)).then((s) => s ?? {}),
+    readJson<ControleRec>(`submissions/${id}/controle.json`),
+    readEssais(id),
   ]);
-  const o = { demande: { ...demande, id }, base, rapport1, couleurs, rapport2, rapport3, pieces, couleursGlb: fichiers.couleurs ?? couleurs?.glb, fichiers, suivi };
+  const o = { demande: { ...demande, id }, base, rapport1, couleurs, rapport2, rapport3, pieces, controle, essais, couleursGlb: fichiers.couleurs ?? couleurs?.glb, fichiers, suivi };
   const steps = buildSteps(o, claudeConfigured());
   const progress = steps.filter((s) => s.state === "done" || s.state === "skip").length / steps.length;
   return { id, ...o, steps, progress };
