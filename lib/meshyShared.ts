@@ -3,10 +3,21 @@ export const MAX_3D = 4;
 /** Dessins comptés vue par vue (une série = 3 vues). */
 export const MAX_IMAGES = 18;
 /**
- * Tarif Meshy (docs.meshy.ai/api/pricing, oct. 2026) : une vue dessinée nano-banana-pro 9 crédits ;
+ * Tarif Meshy (docs.meshy.ai/api/pricing, oct. 2026) : une vue dessinée nano-banana 3 crédits (nano-banana-pro 9) ;
  * 3D sans texture 20 crédits d'après 1 image (le tarif multi-images n'est pas publié : on affiche le vrai montant une fois facturé).
  */
-export const CREDITS = { image: 9, "3d": 20 } as const;
+export const CREDITS = { image: 3, "3d": 20 } as const;
+
+/** Modèles d'image Meshy proposés pour dessiner les vues, avec leur prix par vue (docs.meshy.ai/api/pricing). */
+export const IMAGE_MODELS = {
+  "nano-banana": { label: "Standard", credits: 3 },
+  "nano-banana-pro": { label: "Pro, plus fidèle", credits: 9 },
+} as const;
+export type ImageModel = keyof typeof IMAGE_MODELS;
+export const DEFAULT_IMAGE_MODEL: ImageModel = "nano-banana";
+export const isImageModel = (m: unknown): m is ImageModel => typeof m === "string" && m in IMAGE_MODELS;
+/** Prix d'une vue pour un job (les anciens jobs sans modèle étaient en Pro). */
+export const viewCredits = (j: { model?: string }) => (isImageModel(j.model) ? IMAGE_MODELS[j.model].credits : IMAGE_MODELS["nano-banana-pro"].credits);
 
 /** Les vues dessinées pour chaque pièce : la 3/4 d'abord, puis le côté et l'arrière d'après elle (même objet). */
 export const VUES = [
@@ -67,6 +78,8 @@ export type PieceJob = {
   crop: string;
   /** Le prompt envoyé (dessin). */
   prompt?: string;
+  /** Le modèle d'image utilisé (dessin). */
+  model?: string;
   /** Le dessin produit (job image : la 1re vue) ou utilisé (job 3D). */
   image?: string;
   /** Job image : les vues dessinées (3/4, côté, arrière). Job 3D : les images envoyées. */

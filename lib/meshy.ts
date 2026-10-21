@@ -2,7 +2,7 @@ import { put } from "@vercel/blob";
 import { num, readBytes, readJson, usageCounter, writeJson } from "@/lib/blobJson";
 import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
 import type { Rapport3Rec } from "@/lib/rapports";
-import { imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_3D, MAX_IMAGES, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
+import { DEFAULT_IMAGE_MODEL, isImageModel, imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_3D, MAX_IMAGES, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
 
 export type { PieceJob, Pieces };
 
@@ -21,8 +21,6 @@ export type { PieceJob, Pieces };
  */
 
 const API = "https://api.meshy.ai/openapi/v1";
-/** Modèle d'image de Meshy pour isoler la pièce (nano-banana-pro : 9 crédits l'image, le plus fidèle des Nano Banana). */
-const IMAGE_MODEL = process.env.MESHY_IMAGE_MODEL || "nano-banana-pro";
 const usage = usageCounter(
   "meshy",
   num(process.env.MESHY_PIECES_DAILY_LIMIT, 8),
@@ -65,8 +63,8 @@ const dataUri = async (pathname: string) => {
   return `data:${type};base64,${data.toString("base64")}`;
 };
 
-const drawBody = async (prompt: string, refs: string[]) => ({
-  ai_model: IMAGE_MODEL,
+const drawBody = async (model: string, prompt: string, refs: string[]) => ({
+  ai_model: model,
   prompt,
   reference_image_urls: await Promise.all(refs.map(dataUri)),
   aspect_ratio: "1:1",
@@ -74,7 +72,7 @@ const drawBody = async (prompt: string, refs: string[]) => ({
 });
 
 /** Lance une étape pour une pièce : les vues dessinées (avec le prompt donné) ou la 3D (d'après les vues retenues). */
-export async function startPiece(id: string, index: number, kind: "image" | "3d", prompt?: string) {
+export async function startPiece(id: string, index: number, kind: "image" | "3d", prompt?: string, model?: string) {
   if (!meshyConfigured()) throw new Error("Meshy n'est pas branché (MESHY_API_KEY manquante dans Vercel)");
   const r3 = await readJson<Rapport3Rec>(`submissions/${id}/rapport3.json`);
   const item = r3?.result?.meshy[index];
@@ -90,8 +88,9 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
     if (countImages(state) + VUES.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} vues dessinées par commande atteint`);
     job.prompt = (prompt?.trim() || imagePrompt(item.piece, item.consigne)).slice(0, 3500);
     // Seule la 3/4 part maintenant ; le côté et l'arrière partent d'après elle, au suivi.
+    job.model = isImageModel(model) ? model : DEFAULT_IMAGE_MODEL;
     job.vues = VUES.map((v) => ({ angle: v.key, status: "starting" }));
-    body = await drawBody(viewPrompt(job.prompt, 0), [crop]);
+    body = await drawBody(job.model, viewPrompt(job.prompt, 0), [crop]);
   } else {
     if (count3d(state) >= MAX_3D) throw new Error(`Plafond de ${MAX_3D} générations 3D par commande atteint`);
     const picked = state.choixImage?.[index];
@@ -150,7 +149,7 @@ async function refreshVues(job: PieceJob, file: string) {
       v.error = "La vue 3/4 a échoué";
     } else if (first.image) {
       try {
-        const body = await drawBody(viewPrompt(job.prompt ?? "", k), [job.crop, first.image]);
+        const body = await drawBody(job.model ?? "nano-banana-pro", viewPrompt(job.prompt ?? "", k), [job.crop, first.image]);
         const { result } = await meshy("/image-to-image", { method: "POST", body: JSON.stringify(body) });
         Object.assign(v, { status: "PENDING", taskId: result });
       } catch (e) {
