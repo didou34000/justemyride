@@ -4,23 +4,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { photoSrc } from "@/lib/photo";
 import GlbViewer from "./GlbViewer";
-import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, MAX_3D, MAX_IMAGES, VUES, type PieceJob, type Pieces, type Vue } from "@/lib/meshyShared";
+import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, MAX_3D, MAX_IMAGES, VUES, type PieceJob, type Pieces, type Vue, viewPrompt } from "@/lib/meshyShared";
 import type { Rapport3 } from "@/lib/rapports";
 
 /**
  * Bloc « Pièces Meshy » de l'admin : toutes les pièces à refaire, de haut en bas.
  * Pour chacune : le recadrage de la photo, le prompt (modifiable), puis deux boutons :
- * 1. « Faire l'image » : Meshy dessine la pièce seule, en une image vue de 3/4 ;
- * 2. « Faire la pièce 3D » : d'après l'image retenue.
+ * 1. « Faire les images » : Meshy dessine la pièce seule en 2 images, de face puis de côté, chacune avec son prompt ;
+ * 2. « Faire la pièce 3D » : d'après les 2 images retenues.
  * Chaque essai reste visible ; on retient le meilleur dessin et la meilleure 3D.
  */
+/** Libellés des anciennes vues (3/4, arrière). */
+const OLD_LABELS: Record<string, string> = { "34": "3/4", arriere: "Arrière" };
 const jobFailedVue = (v: Vue) => ["FAILED", "CANCELED", "error"].includes(v.status);
 
 export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3: Rapport3; crops?: (string | null)[]; pieces: Pieces }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [prompts, setPrompts] = useState<Record<number, string>>({});
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [imageModels, setImageModels] = useState<Record<number, ImageModel>>({});
   const n3d = pieces.jobs.filter((j) => jobKind(j) === "3d").length;
   const nImg = pieces.jobs.reduce((t, j) => t + imageCount(j), 0);
@@ -45,20 +47,21 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
   }
 
   const vueStatus = (v: Vue) =>
-    jobFailedVue(v) ? `Échec : ${v.error ?? v.status}` : v.taskId ? `Meshy dessine… ${v.progress ?? 0} %` : "Attend la vue 3/4";
+    jobFailedVue(v) ? `Échec : ${v.error ?? v.status}` : v.taskId ? `Meshy dessine… ${v.progress ?? 0} %` : "Attend l'image de face";
   const status = (j: PieceJob) =>
     jobFailed(j) ? `Échec : ${j.error ?? j.status}` : `${jobKind(j) === "image" ? "Meshy dessine" : "Meshy construit la 3D"}… ${j.progress ?? 0} %`;
 
   return (
     <>
       <p className="sub">
-        Pour chaque pièce : « Faire l&apos;image » envoie la photo recadrée à Meshy, qui dessine l&apos;élément seul, en une image vue de 3/4. Tu peux corriger
-        le prompt avant. Quand l&apos;image te va, « Faire la pièce 3D » construit la 3D d&apos;après elle. Tu retiens ensuite la meilleure 3D. Payant :{" "}
+        Pour chaque pièce : « Faire les images » envoie la photo recadrée à Meshy, qui dessine l&apos;élément seul en 2 images : de face (complet), puis de
+        côté d&apos;après l&apos;image de face, pour voir la largeur. Chaque image a son prompt, que tu peux corriger avant. Quand les 2 images te vont, « Faire la
+        pièce 3D » construit la 3D d&apos;après les deux. Tu retiens ensuite la meilleure 3D. Payant :{" "}
         {n3d}/{MAX_3D} générations 3D et {nImg}/{MAX_IMAGES} images dessinées utilisées pour cette commande.
       </p>
       <p className="sub">
-        Prix : une image = {IMAGE_MODELS["nano-banana"].credits} crédits en Standard, {IMAGE_MODELS["nano-banana-pro"].credits} en Pro ; une 3D ≈ {CREDITS["3d"]} crédits (le vrai montant s&apos;affiche une fois
-        facturé). Dépensé sur cette commande : <b>{total} crédits</b>.
+        Prix : les 2 images = {IMAGE_MODELS["nano-banana"].credits * VUES.length} crédits en Standard, {IMAGE_MODELS["nano-banana-pro"].credits * VUES.length} en
+        Pro ; une 3D ≈ {CREDITS["3d"]} crédits (Meshy ne publie pas le prix exact à partir de 2 images : le vrai montant s&apos;affiche une fois facturé). Dépensé sur cette commande : <b>{total} crédits</b>.
       </p>
       {error && <p className="notice err">{error}</p>}
       <ol className="pieces">
@@ -73,9 +76,10 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
           const picked3d = pieces.choix3d?.[i] ?? okModels.at(-1)?.n;
           const imgRunning = images.some(({ j }) => jobKind(j) === "image" && !jobDone(j));
           const modelRunning = models.some(({ j }) => !jobDone(j));
-          const prompt = prompts[i] ?? imagePrompt(m.piece, m.consigne);
+          const base = imagePrompt(m.piece, m.consigne);
+          const viewPrompts = VUES.map((_, k) => prompts[`${i}-${k}`] ?? viewPrompt(base, k));
           const model = imageModels[i] ?? DEFAULT_IMAGE_MODEL;
-          const imageCost = IMAGE_MODELS[model].credits;
+          const imageCost = IMAGE_MODELS[model].credits * VUES.length;
           return (
             <li key={i} className="piece">
               <h3 className="piece-head">
@@ -95,18 +99,16 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                     <p className="notice err">Recadrage impossible (photo « {m.photo} » introuvable).</p>
                   )}
                 </div>
-                <label className="piece-prompt">
-                  <span className="sub">Prompt envoyé à Meshy</span>
-                  <textarea value={prompt} rows={8} onChange={(e) => setPrompts((p) => ({ ...p, [i]: e.target.value }))} />
-                  <span className="sub">Ajouté devant, pour l&apos;angle :</span>
-                  <ul className="piece-vues">
-                    {VUES.map((v) => (
-                      <li key={v.key}>
-                        <b>{v.label}</b> : {v.prompt}
-                      </li>
-                    ))}
-                  </ul>
-                </label>
+                <div className="piece-prompt">
+                  {VUES.map((v, k) => (
+                    <label key={v.key}>
+                      <span className="sub">
+                        Prompt de l&apos;image {k + 1} · {v.label}
+                      </span>
+                      <textarea value={viewPrompts[k]} rows={7} onChange={(e) => setPrompts((p) => ({ ...p, [`${i}-${k}`]: e.target.value }))} />
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="admin-actions">
                 <label className="sub">
@@ -123,10 +125,10 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                   className="cta"
                   disabled={Boolean(busy) || !crop || imgRunning || nImg >= MAX_IMAGES}
                   onClick={() =>
-                    act(`img${i}`, { piece: i, action: "image", prompt, model }, `Lancer une image 3/4 Meshy (${imageCost} crédits) pour « ${m.piece} » ?`)
+                    act(`img${i}`, { piece: i, action: "image", prompt: base, prompts: viewPrompts, model }, `Lancer 2 images Meshy, de face et de côté (${imageCost} crédits) pour « ${m.piece} » ?`)
                   }
                 >
-                  {busy === `img${i}` ? "Envoi…" : imgRunning ? "Image en cours…" : okImages.length ? "1. Refaire l'image" : "1. Faire l'image"} ·{" "}
+                  {busy === `img${i}` ? "Envoi…" : imgRunning ? "Images en cours…" : okImages.length ? "1. Refaire les images" : "1. Faire les images"} ·{" "}
                   {imageCost} cr.
                 </button>
                 <button
@@ -143,7 +145,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
 
               {images.length > 0 && (
                 <>
-                  <p className="sub">Images : retiens celle qui part en 3D.</p>
+                  <p className="sub">Images : retiens la paire qui part en 3D.</p>
                   <div className="piece-sets">
                     {images.map(({ j, n }) => {
                       const vues: Vue[] = j.vues ?? [{ angle: "34", status: j.status, progress: j.progress, image: j.image, error: j.error, taskId: j.taskId ?? j.imageTaskId }];
@@ -163,7 +165,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                                     <span>{vueStatus(v)}</span>
                                   </div>
                                 )}
-                                <figcaption>{VUES.find((x) => x.key === v.angle)?.label}</figcaption>
+                                <figcaption>{VUES.find((x) => x.key === v.angle)?.label ?? OLD_LABELS[v.angle]}</figcaption>
                               </figure>
                             ))}
                           </div>
@@ -174,7 +176,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                               disabled={!ok || n === pickedImg || Boolean(busy) || !jobDone(j)}
                               onClick={() => act(`ci${n}`, { piece: i, action: "choisir-image", job: n })}
                             >
-                              {n === pickedImg ? "✓ Retenue pour la 3D" : "Retenir cette image"}
+                              {n === pickedImg ? "✓ Retenue pour la 3D" : "Retenir ces images"}
                             </button>
                             <span className="sub">{cost(j)} cr.</span>
                           </div>

@@ -9,9 +9,9 @@ export type { PieceJob, Pieces };
 /**
  * Étape 8 : Meshy refait les pièces essentielles qui manquent (roue complète, aileron…), en deux temps par pièce,
  * chacun lancé par un bouton de l'admin :
- * 1. image : d'après la photo du client recadrée sur la pièce, Meshy dessine la pièce SEULE sur fond neutre,
- *    en UNE image vue de 3/4. Le prompt est modifiable ;
- * 2. 3D : Meshy construit la pièce d'après l'image retenue (image-to-3d ; une photo de voiture lui ferait refaire le reste).
+ * 1. images : d'après la photo du client recadrée sur la pièce, Meshy dessine la pièce SEULE sur fond neutre, en 2 images :
+ *    de face, puis de côté d'après l'image de face (même objet). Chaque image a son prompt, modifiable ;
+ * 2. 3D : Meshy construit la pièce d'après les 2 images (multi-image-to-3d ; une photo de voiture lui ferait refaire le reste).
  *
  * Garde-fous, pour que la facture ne s'emballe pas :
  * - rien ne part tout seul : chaque étape part d'un clic ;
@@ -72,7 +72,7 @@ const drawBody = async (model: string, prompt: string, refs: string[]) => ({
 });
 
 /** Lance une étape pour une pièce : les vues dessinées (avec le prompt donné) ou la 3D (d'après les vues retenues). */
-export async function startPiece(id: string, index: number, kind: "image" | "3d", prompt?: string, model?: string) {
+export async function startPiece(id: string, index: number, kind: "image" | "3d", prompt?: string, model?: string, prompts?: string[]) {
   if (!meshyConfigured()) throw new Error("Meshy n'est pas branché (MESHY_API_KEY manquante dans Vercel)");
   const r3 = await readJson<Rapport3Rec>(`submissions/${id}/rapport3.json`);
   const item = r3?.result?.meshy[index];
@@ -87,18 +87,18 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
   if (kind === "image") {
     if (countImages(state) + VUES.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} images dessinées par commande atteint`);
     job.prompt = (prompt?.trim() || imagePrompt(item.piece, item.consigne)).slice(0, 3500);
-    // Seule la 3/4 part maintenant ; le côté et l'arrière partent d'après elle, au suivi.
+    job.prompts = VUES.map((_, k) => (prompts?.[k]?.trim() || viewPrompt(job.prompt!, k)).slice(0, 4000));
+    // Seule l'image de face part maintenant ; celle de côté part d'après elle, au suivi.
     job.model = isImageModel(model) ? model : DEFAULT_IMAGE_MODEL;
     job.vues = VUES.map((v) => ({ angle: v.key, status: "starting" }));
-    body = await drawBody(job.model, viewPrompt(job.prompt, 0), [crop]);
+    body = await drawBody(job.model, job.prompts[0], [crop]);
   } else {
     if (count3d(state) >= MAX_3D) throw new Error(`Plafond de ${MAX_3D} générations 3D par commande atteint`);
     const picked = state.choixImage?.[index];
     const from =
       (picked !== undefined && jobImages(state.jobs[picked] ?? ({} as PieceJob)).length ? state.jobs[picked] : undefined) ??
       [...state.jobs].reverse().find((j) => j.index === index && jobKind(j) === "image" && jobImages(j).length);
-    // Une seule image, la 3/4 (les anciennes séries de 3 vues partent aussi d'après leur 3/4).
-    const images = from ? jobImages(from).slice(0, 1) : [];
+    const images = from ? jobImages(from).slice(0, 4) : [];
     if (!images.length) throw new Error("Il faut d'abord une image dessinée réussie de la pièce");
     await usage.check();
     job.image = images[0];
@@ -126,7 +126,7 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
   return state;
 }
 
-/** Suit les vues d'un job image ; une fois la 3/4 dessinée, lance le côté et l'arrière d'après elle. */
+/** Suit les images d'un job ; une fois la 1re dessinée (de face), lance les suivantes d'après elle. */
 async function refreshVues(job: PieceJob, file: string) {
   const vues = job.vues!;
   for (const v of vues) {
@@ -147,10 +147,10 @@ async function refreshVues(job: PieceJob, file: string) {
     if (!k || v.taskId || vueDone(v)) continue;
     if (failed(first.status)) {
       v.status = "error";
-      v.error = "La vue 3/4 a échoué";
+      v.error = "La 1re image a échoué";
     } else if (first.image) {
       try {
-        const body = await drawBody(job.model ?? "nano-banana-pro", viewPrompt(job.prompt ?? "", k), [job.crop, first.image]);
+        const body = await drawBody(job.model ?? "nano-banana-pro", job.prompts?.[k] ?? viewPrompt(job.prompt ?? "", k), [job.crop, first.image]);
         const { result } = await meshy("/image-to-image", { method: "POST", body: JSON.stringify(body) });
         Object.assign(v, { status: "PENDING", taskId: result });
       } catch (e) {
