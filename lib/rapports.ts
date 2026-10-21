@@ -1,9 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { put } from "@vercel/blob";
+import { putFile } from "@/lib/store";
 import sharp from "sharp";
 import { z } from "zod/v4";
 import { readBytes, readJson } from "@/lib/blobJson";
-import { BLOB_ACCESS } from "@/lib/storage";
 import { imageBlock, photoBlocks, readDemande, runClaude, type Rec } from "@/lib/claude";
 import { readBase } from "@/lib/base";
 import { compressGlb, FINITIONS, materialTable, readGlb, repaint, writeGlb, type Finition, type MatInfo } from "@/lib/glb";
@@ -198,13 +197,7 @@ export async function couleurs(id: string, sheets: { id: string; image: string }
       const applied = repaint(doc, paints);
       // readGlb a décompressé le modèle : on le recompresse pour ne pas stocker une copie 4 fois plus lourde.
       const bytes = await writeGlb(await compressGlb(doc));
-      const blob = await put(`submissions/${id}/couleurs.glb`, Buffer.from(bytes), {
-        access: BLOB_ACCESS,
-        contentType: "model/gltf-binary",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        multipart: bytes.byteLength > 20 * 1024 * 1024,
-      });
+      const blob = await putFile(`submissions/${id}/couleurs.glb`, bytes, "model/gltf-binary");
       return { glb: blob.pathname, applied } as Partial<CouleursRec>;
     }
   ) as Promise<CouleursRec>;
@@ -352,12 +345,7 @@ async function crop(id: string, i: number, pathname: string, c: { x: number; y: 
     .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 90 })
     .toBuffer();
-  const blob = await put(`submissions/${id}/piece-${i + 1}.jpg`, out, {
-    access: BLOB_ACCESS,
-    contentType: "image/jpeg",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  const blob = await putFile(`submissions/${id}/piece-${i + 1}.jpg`, out, "image/jpeg");
   return blob.pathname;
 }
 

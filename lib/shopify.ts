@@ -20,6 +20,9 @@ const extraVariant: Record<string, string | undefined> = {
   vitrine: process.env.SHOPIFY_VARIANT_CASE || "gid://shopify/ProductVariant/54398137205083",
 };
 
+// « Aperçu 3D supplémentaire » (5 €, sans livraison) : le 2e aperçu d'un client et les suivants.
+export const APERCU_VARIANT = process.env.SHOPIFY_VARIANT_APERCU || "gid://shopify/ProductVariant/54454579757403";
+
 /** Seule la clé Storefront (secrète) reste à fournir, sur Vercel. Sans elle : mode démo. */
 export function shopifyConfigured() {
   return Boolean(process.env.SHOPIFY_STOREFRONT_TOKEN);
@@ -53,6 +56,21 @@ export async function createCheckout(c: Config): Promise<string> {
     if (v) lines.push({ merchandiseId: v, quantity: 1, attributes: [] });
   }
 
+  return cartCreate({ lines });
+}
+
+/**
+ * Paiement d'un aperçu supplémentaire. La ligne porte l'empreinte du client (attribut caché « _client ») :
+ * le webhook de commande payée (/api/shopify/webhook) s'en sert pour lui ajouter un crédit.
+ */
+export function createApercuCheckout(email: string, client: string) {
+  return cartCreate({
+    lines: [{ merchandiseId: APERCU_VARIANT, quantity: 1, attributes: [{ key: "_client", value: client }] }],
+    buyerIdentity: { email },
+  });
+}
+
+async function cartCreate(input: Record<string, unknown>): Promise<string> {
   const res = await fetch(
     `https://${STORE_DOMAIN}/api/${API_VERSION}/graphql.json`,
     {
@@ -68,7 +86,7 @@ export async function createCheckout(c: Config): Promise<string> {
             userErrors { field message }
           }
         }`,
-        variables: { input: { lines } },
+        variables: { input },
       }),
     }
   );

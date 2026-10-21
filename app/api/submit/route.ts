@@ -1,9 +1,10 @@
-import { put } from "@vercel/blob";
 import { after, NextResponse } from "next/server";
-import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
+import { storageEnabled } from "@/lib/storage";
+import { putFile } from "@/lib/store";
 import { notifyNewRequest } from "@/lib/notify";
 import { fetchBase } from "@/lib/base";
 import type { Base } from "@/lib/catalog";
+import { authConfigured, clientKey, clientStatus, readClient, saveClient, userFromRequest } from "@/lib/clients";
 
 type Submission = {
   id: string;
@@ -25,17 +26,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stockage non configuré" }, { status: 503 });
   }
 
-  const s = (await request.json()) as Submission;
+  const s = (await request.json()) as Submission & { client?: string; apercuPaye?: boolean };
+  delete s.client;
+  delete s.apercuPaye;
+
+  // Connexion branchée : l'adresse est celle du compte, et un seul aperçu gratuit par compte.
+  const user = authConfigured() ? await userFromRequest(request) : null;
+  if (authConfigured() && !user) return NextResponse.json({ error: "Connecte-toi pour envoyer ta voiture" }, { status: 401 });
+  if (user) s.email = user.email;
   if (!/^[\w-]{6,40}$/.test(s.id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   if (!/^\S+@\S+\.\S+$/.test(s.email)) return NextResponse.json({ error: "Email invalide" }, { status: 400 });
   if (!s.files?.length) return NextResponse.json({ error: "Aucun fichier" }, { status: 400 });
   if (s.size !== undefined && !/^1-(43|24|18)$/.test(s.size)) delete s.size;
 
-  await put(
-    `submissions/${s.id}/demande.json`,
-    JSON.stringify({ ...s, receivedAt: new Date().toISOString() }, null, 2),
-    { access: BLOB_ACCESS, contentType: "application/json", addRandomSuffix: false }
-  );
+  if (user) {
+    const key = clientKey(user.email);
+    const c = await readClient(key, user.email);
+    const st = clientStatus(c, user.email);
+    if (!st.peutEnvoyer) {
+      return NextResponse.json({ error: "Ton aperçu gratuit est déjà utilisé : le suivant est payant.", payant: true }, { status: 402 });
+    }
+    const payee = !st.gratuit;
+    if (payee) c.credits -= 1;
+    c.apercus.push({ id: s.id, at: new Date().toISOString(), ...(payee ? { payee } : {}) });
+    await saveClient(key, c);
+    s.client = key;
+    if (payee) s.apercuPaye = true;
+  }
+
+  await putFile(`submissions/${s.id}/demande.json`, JSON.stringify({ ...s, receivedAt: new Date().toISOString() }, null, 2), "application/json");
 
   // L'alerte ne doit jamais faire échouer l'envoi : la demande est déjà enregistrée.
   let alert: string;

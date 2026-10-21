@@ -1,28 +1,21 @@
-import { get, put } from "@vercel/blob";
-import { BLOB_ACCESS } from "@/lib/storage";
+import { getFile, putFile } from "@/lib/store";
 
 /** Petits fichiers JSON dans le stockage (fiches de demande, compteurs, résultats). */
 export async function readJson<T>(pathname: string): Promise<T | null> {
-  const r = await get(pathname, { access: BLOB_ACCESS, useCache: false }).catch(() => null);
-  if (!r || r.statusCode !== 200) return null;
+  const r = await getFile(pathname, true);
+  if (!r) return null;
   return JSON.parse(await new Response(r.stream).text()) as T;
 }
 
-export const writeJson = (pathname: string, data: unknown) =>
-  put(pathname, JSON.stringify(data, null, 2), {
-    access: BLOB_ACCESS,
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+export const writeJson = (pathname: string, data: unknown) => putFile(pathname, JSON.stringify(data, null, 2), "application/json");
 
 /** Fichier privé → octets + type (pour les envoyer à une API qui ne lit pas le stockage privé). */
 export async function readBytes(pathname: string) {
-  const r = await get(pathname, { access: BLOB_ACCESS });
-  if (!r || r.statusCode !== 200) throw new Error(`Fichier introuvable : ${pathname}`);
+  const r = await getFile(pathname);
+  if (!r) throw new Error(`Fichier introuvable : ${pathname}`);
   return {
     data: Buffer.from(await new Response(r.stream).arrayBuffer()),
-    type: r.headers.get("content-type") || "image/jpeg",
+    type: r.contentType === "application/octet-stream" ? "image/jpeg" : r.contentType,
   };
 }
 

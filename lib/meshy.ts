@@ -1,6 +1,6 @@
-import { put } from "@vercel/blob";
+import { putFile } from "@/lib/store";
 import { num, readBytes, readJson, usageCounter, writeJson } from "@/lib/blobJson";
-import { BLOB_ACCESS, storageEnabled } from "@/lib/storage";
+import { storageEnabled } from "@/lib/storage";
 import type { Rapport3Rec } from "@/lib/rapports";
 import { readGlb, slimGlb, writeGlb } from "@/lib/glb";
 import { DEFAULT_IMAGE_MODEL, isImageModel, imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_3D, MAX_IMAGES, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
@@ -52,14 +52,7 @@ const copy = async (path: string, url: string, contentType: string) => {
   let bytes: Uint8Array = new Uint8Array(await res.arrayBuffer());
   // Les pièces 3D sont allégées avant stockage (environ 4 fois moins lourdes), comme les voitures.
   if (path.endsWith(".glb")) bytes = await writeGlb(await slimGlb(await readGlb(bytes)));
-  return (
-    await put(path, Buffer.from(bytes), {
-      access: BLOB_ACCESS,
-      contentType: res.headers.get("content-type") || contentType,
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    })
-  ).pathname;
+  return (await putFile(path, bytes, res.headers.get("content-type") || contentType)).pathname;
 };
 
 const dataUri = async (pathname: string) => {
