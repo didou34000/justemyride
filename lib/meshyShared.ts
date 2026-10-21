@@ -1,7 +1,7 @@
 /** Plafonds par commande, échecs compris : générations 3D et dessins (tous deux payants chez Meshy). */
 export const MAX_3D = 4;
-/** Dessins comptés vue par vue (une série = 3 vues). */
-export const MAX_IMAGES = 18;
+/** Dessins comptés image par image (une image 3/4 par clic). */
+export const MAX_IMAGES = 12;
 /**
  * Tarif Meshy (docs.meshy.ai/api/pricing, oct. 2026) : une vue dessinée nano-banana 3 crédits (nano-banana-pro 9) ;
  * 3D sans texture 20 crédits d'après 1 image (le tarif multi-images n'est pas publié : on affiche le vrai montant une fois facturé).
@@ -19,25 +19,14 @@ export const isImageModel = (m: unknown): m is ImageModel => typeof m === "strin
 /** Prix d'une vue pour un job (les anciens jobs sans modèle étaient en Pro). */
 export const viewCredits = (j: { model?: string }) => (isImageModel(j.model) ? IMAGE_MODELS[j.model].credits : IMAGE_MODELS["nano-banana-pro"].credits);
 
-/** Les vues dessinées pour chaque pièce : la 3/4 d'abord, puis le côté et l'arrière d'après elle (même objet). */
+/** Une seule image dessinée par pièce : la vue 3/4. */
 export const VUES = [
   {
     key: "34",
     label: "3/4 avant",
     prompt:
-      "VIEW 1 of 3, THREE-QUARTER VIEW: the object turned about 40° away from the camera, so its face AND its side depth are both clearly visible. Not a flat front view.",
-  },
-  {
-    key: "cote",
-    label: "Côté",
-    prompt:
-      "VIEW 2 of 3, SIDE VIEW: the same object turned 90°, seen exactly in profile, showing its full thickness (for a wheel: the tyre tread and the width of the rim).",
-  },
-  {
-    key: "arriere",
-    label: "Arrière",
-    prompt:
-      "VIEW 3 of 3, BACK VIEW: the same object turned 180°, showing its back or inner side (for a wheel: the inner face of the rim and the hub mounting face).",
+      "THREE-QUARTER VIEW, camera at 45°: the object is rotated about 45° away from the camera, so we see its front face AND its side (its thickness) at the same time, in perspective. " +
+      "NOT a front view, NOT a flat face-on view, NOT a profile view. For a wheel: the rim face is seen as an ellipse and the tyre tread is clearly visible on one side.",
   },
 ] as const;
 const SAME =
@@ -46,7 +35,7 @@ const SAME =
 export const viewPrompt = (base: string, k: number) => `${VUES[k].prompt}${k ? ` ${SAME}` : ""}\n${base}`;
 
 /**
- * Le prompt de base envoyé au modèle d'image de Meshy pour dessiner une pièce seule (l'angle de chaque vue s'ajoute, voir VUES).
+ * Le prompt de base envoyé au modèle d'image de Meshy pour dessiner une pièce seule (l'angle 3/4 s'ajoute devant, voir VUES).
  * Partagé avec la page admin, qui l'affiche et permet de le corriger avant d'envoyer.
  */
 export const imagePrompt = (piece: string, consigne: string) =>
@@ -58,7 +47,7 @@ export const imagePrompt = (piece: string, consigne: string) =>
   `Details (French): ${consigne}`;
 
 export type Vue = {
-  angle: (typeof VUES)[number]["key"];
+  angle: string;
   status: PieceJob["status"];
   taskId?: string;
   progress?: number;

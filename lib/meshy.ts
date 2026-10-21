@@ -9,13 +9,13 @@ export type { PieceJob, Pieces };
 /**
  * Étape 8 : Meshy refait les pièces essentielles qui manquent (roue complète, aileron…), en deux temps par pièce,
  * chacun lancé par un bouton de l'admin :
- * 1. images : d'après la photo du client recadrée sur la pièce, Meshy dessine la pièce SEULE sur fond neutre, en 3 vues :
- *    la 3/4 d'abord, puis le côté et l'arrière d'après cette 3/4 (pour garder le même objet). Le prompt est modifiable ;
- * 2. 3D : Meshy construit la pièce d'après les vues retenues (multi-image-to-3d ; une photo de voiture lui ferait refaire le reste).
+ * 1. image : d'après la photo du client recadrée sur la pièce, Meshy dessine la pièce SEULE sur fond neutre,
+ *    en UNE image vue de 3/4. Le prompt est modifiable ;
+ * 2. 3D : Meshy construit la pièce d'après l'image retenue (image-to-3d ; une photo de voiture lui ferait refaire le reste).
  *
  * Garde-fous, pour que la facture ne s'emballe pas :
  * - rien ne part tout seul : chaque étape part d'un clic ;
- * - au maximum 4 générations 3D par commande (MAX_3D) et 18 vues dessinées (MAX_IMAGES, soit 6 séries), échecs compris ;
+ * - au maximum 4 générations 3D par commande (MAX_3D) et 12 images dessinées (MAX_IMAGES), échecs compris ;
  * - plafonds 3D par jour et par mois (MESHY_PIECES_DAILY_LIMIT, MESHY_PIECES_MONTHLY_LIMIT), comptés dans le stockage.
  * Le vrai plafond reste le solde du compte Meshy : ne pas activer la recharge automatique.
  */
@@ -85,7 +85,7 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
   const job: PieceJob = { index, piece: item.piece, kind, crop, status: "starting", startedAt: new Date().toISOString() };
   let body: object;
   if (kind === "image") {
-    if (countImages(state) + VUES.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} vues dessinées par commande atteint`);
+    if (countImages(state) + VUES.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} images dessinées par commande atteint`);
     job.prompt = (prompt?.trim() || imagePrompt(item.piece, item.consigne)).slice(0, 3500);
     // Seule la 3/4 part maintenant ; le côté et l'arrière partent d'après elle, au suivi.
     job.model = isImageModel(model) ? model : DEFAULT_IMAGE_MODEL;
@@ -97,8 +97,9 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
     const from =
       (picked !== undefined && jobImages(state.jobs[picked] ?? ({} as PieceJob)).length ? state.jobs[picked] : undefined) ??
       [...state.jobs].reverse().find((j) => j.index === index && jobKind(j) === "image" && jobImages(j).length);
-    const images = from ? jobImages(from).slice(0, 4) : [];
-    if (!images.length) throw new Error("Il faut d'abord des vues dessinées réussies de la pièce");
+    // Une seule image, la 3/4 (les anciennes séries de 3 vues partent aussi d'après leur 3/4).
+    const images = from ? jobImages(from).slice(0, 1) : [];
+    if (!images.length) throw new Error("Il faut d'abord une image dessinée réussie de la pièce");
     await usage.check();
     job.image = images[0];
     job.images = images;
