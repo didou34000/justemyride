@@ -3,7 +3,7 @@ import { num, readBytes, readJson, usageCounter, writeJson } from "@/lib/blobJso
 import { storageEnabled } from "@/lib/storage";
 import type { Rapport3Rec } from "@/lib/rapports";
 import { readGlb, slimGlb, writeGlb } from "@/lib/glb";
-import { DEFAULT_IMAGE_MODEL, isImageModel, imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_3D, MAX_IMAGES, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
+import { count3dOf, DEFAULT_IMAGE_MODEL, isImageModel, imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_IMAGES, TYPES_3D, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
 
 export type { PieceJob, Pieces };
 
@@ -16,7 +16,7 @@ export type { PieceJob, Pieces };
  *
  * Garde-fous, pour que la facture ne s'emballe pas :
  * - rien ne part tout seul : chaque étape part d'un clic ;
- * - au maximum 4 générations 3D par commande (MAX_3D) et 12 images dessinées (MAX_IMAGES), échecs compris ;
+ * - par commande, échecs compris : 4 générations 3D de pièces et 2 de stickers (TYPES_3D), 12 images dessinées (MAX_IMAGES) ;
  * - plafonds 3D par jour et par mois (MESHY_PIECES_DAILY_LIMIT, MESHY_PIECES_MONTHLY_LIMIT), comptés dans le stockage.
  * Le vrai plafond reste le solde du compte Meshy : ne pas activer la recharge automatique.
  */
@@ -32,7 +32,6 @@ export const meshyConfigured = () => Boolean(process.env.MESHY_API_KEY && storag
 
 const path = (id: string) => `submissions/${id}/meshy-pieces.json`;
 export const readPieces = async (id: string) => (await readJson<Pieces>(path(id))) ?? { jobs: [] };
-const count3d = (p: Pieces) => p.jobs.filter((j) => jobKind(j) === "3d").length;
 const countImages = (p: Pieces) => p.jobs.reduce((t, j) => t + imageCount(j), 0);
 
 async function meshy(p: string, init?: RequestInit) {
@@ -79,18 +78,22 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
   if (state.jobs.some((j) => j.index === index && jobKind(j) === kind && !jobDone(j)))
     throw new Error(kind === "image" ? "Un dessin est déjà en cours pour cette pièce" : "Une 3D est déjà en cours pour cette pièce");
 
-  const job: PieceJob = { index, piece: item.piece, kind, crop, status: "starting", startedAt: new Date().toISOString() };
+  const type = item.type ?? "piece";
+  const job: PieceJob = { index, piece: item.piece, type, kind, crop, status: "starting", startedAt: new Date().toISOString() };
+  // Un sticker est plat : une seule image, de face, suffit.
+  const vues = type === "sticker" ? VUES.slice(0, 1) : VUES;
   let body: object;
   if (kind === "image") {
-    if (countImages(state) + VUES.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} images dessinées par commande atteint`);
-    job.prompt = (prompt?.trim() || imagePrompt(item.piece, item.consigne)).slice(0, 3500);
-    job.prompts = VUES.map((_, k) => (prompts?.[k]?.trim() || viewPrompt(job.prompt!, k)).slice(0, 4000));
+    if (countImages(state) + vues.length > MAX_IMAGES) throw new Error(`Plafond de ${MAX_IMAGES} images dessinées par commande atteint`);
+    job.prompt = (prompt?.trim() || imagePrompt(item.piece, item.consigne, type)).slice(0, 3500);
+    job.prompts = vues.map((_, k) => (prompts?.[k]?.trim() || viewPrompt(job.prompt!, k)).slice(0, 4000));
     // Seule l'image de face part maintenant ; celle de côté part d'après elle, au suivi.
     job.model = isImageModel(model) ? model : DEFAULT_IMAGE_MODEL;
-    job.vues = VUES.map((v) => ({ angle: v.key, status: "starting" }));
+    job.vues = vues.map((v) => ({ angle: v.key, status: "starting" }));
     body = await drawBody(job.model, job.prompts[0], [crop]);
   } else {
-    if (count3d(state) >= MAX_3D) throw new Error(`Plafond de ${MAX_3D} générations 3D par commande atteint`);
+    const max = TYPES_3D[type].max;
+    if (count3dOf(state, type) >= max) throw new Error(`Plafond de ${max} générations 3D (${TYPES_3D[type].label.toLowerCase()}s) par commande atteint`);
     const picked = state.choixImage?.[index];
     const from =
       (picked !== undefined && jobImages(state.jobs[picked] ?? ({} as PieceJob)).length ? state.jobs[picked] : undefined) ??
@@ -102,8 +105,9 @@ export async function startPiece(id: string, index: number, kind: "image" | "3d"
     job.images = images;
     job.endpoint = images.length > 1 ? "multi-image-to-3d" : "image-to-3d";
     const urls = await Promise.all(images.map(dataUri));
-    // Sans texture : on repeint nous-mêmes, et ça coûte moins de crédits.
-    body = images.length > 1 ? { image_urls: urls, should_texture: false } : { image_url: urls[0], should_texture: false };
+    // Sans texture pour les pièces : on repeint nous-mêmes, et ça coûte moins de crédits. Un sticker, lui, n'est que son dessin : on garde la texture.
+    const should_texture = type === "sticker";
+    body = images.length > 1 ? { image_urls: urls, should_texture } : { image_url: urls[0], should_texture };
   }
   // Réservation avant l'appel : un double clic ne lance pas deux générations payantes.
   state.jobs.push(job);

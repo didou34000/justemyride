@@ -5,7 +5,7 @@ import { readJson } from "@/lib/blobJson";
 import { readFichiers } from "@/lib/fichiers";
 import { controle, couleurs, glbLoader, rapport1, rapport2, rapport3, readEssais, type CouleursRec } from "@/lib/rapports";
 import { readPieces } from "@/lib/meshy";
-import { jobKind, MAX_3D } from "@/lib/meshyShared";
+import { count3dOf, TYPES_3D } from "@/lib/meshyShared";
 import { CONTROLE } from "@/lib/steps";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       if (essais.length >= CONTROLE.maxEssais && force !== true)
         return NextResponse.json({ error: `${CONTROLE.maxEssais} contrôles déjà faits : à toi de décider` }, { status: 409 });
       const pieces = await readPieces(id);
-      const restant = Math.max(0, MAX_3D - pieces.jobs.filter((j) => jobKind(j) === "3d").length);
+      const restant = { pieces: Math.max(0, TYPES_3D.piece.max - count3dOf(pieces, "piece")), stickers: Math.max(0, TYPES_3D.sticker.max - count3dOf(pieces, "sticker")) };
       return NextResponse.json({ rec: await controle(id, views, glb, restant) });
     }
     return NextResponse.json({ error: "Étape inconnue" }, { status: 400 });

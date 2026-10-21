@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { photoSrc } from "@/lib/photo";
 import GlbViewer from "./GlbViewer";
-import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, MAX_3D, MAX_IMAGES, VUES, type PieceJob, type Pieces, type Vue, viewPrompt } from "@/lib/meshyShared";
+import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, count3dOf, MAX_IMAGES, TYPES_3D, VUES, type PieceJob, type Pieces, type Vue, viewPrompt } from "@/lib/meshyShared";
 import type { Rapport3 } from "@/lib/rapports";
 
 /**
@@ -24,7 +24,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
   const [error, setError] = useState("");
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [imageModels, setImageModels] = useState<Record<number, ImageModel>>({});
-  const n3d = pieces.jobs.filter((j) => jobKind(j) === "3d").length;
+  const n3d = { piece: count3dOf(pieces, "piece"), sticker: count3dOf(pieces, "sticker") };
   const nImg = pieces.jobs.reduce((t, j) => t + imageCount(j), 0);
   // Crédits réellement facturés quand Meshy les donne, sinon le tarif (un échec est remboursé).
   const cost = (j: PieceJob) =>
@@ -57,7 +57,8 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
         Pour chaque pièce : « Faire les images » envoie la photo recadrée à Meshy, qui dessine l&apos;élément seul en 2 images : de face (complet), puis de
         côté d&apos;après l&apos;image de face, pour voir la largeur. Chaque image a son prompt, que tu peux corriger avant. Quand les 2 images te vont, « Faire la
         pièce 3D » construit la 3D d&apos;après les deux. Tu retiens ensuite la meilleure 3D. Payant :{" "}
-        {n3d}/{MAX_3D} générations 3D et {nImg}/{MAX_IMAGES} images dessinées utilisées pour cette commande.
+        {n3d.piece}/{TYPES_3D.piece.max} générations 3D de pièces, {n3d.sticker}/{TYPES_3D.sticker.max} de stickers et {nImg}/{MAX_IMAGES} images
+        dessinées utilisées pour cette commande. Un sticker n&apos;a qu&apos;une image (de face) et garde ses couleurs en 3D (≈{CREDITS["3d"] + 10} cr.).
       </p>
       <p className="sub">
         Prix : les 2 images = {IMAGE_MODELS["nano-banana"].credits * VUES.length} crédits en Standard, {IMAGE_MODELS["nano-banana-pro"].credits * VUES.length} en
@@ -76,14 +77,18 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
           const picked3d = pieces.choix3d?.[i] ?? okModels.at(-1)?.n;
           const imgRunning = images.some(({ j }) => jobKind(j) === "image" && !jobDone(j));
           const modelRunning = models.some(({ j }) => !jobDone(j));
-          const base = imagePrompt(m.piece, m.consigne);
-          const viewPrompts = VUES.map((_, k) => prompts[`${i}-${k}`] ?? viewPrompt(base, k));
+          const type = m.type ?? "piece";
+          const vues = type === "sticker" ? VUES.slice(0, 1) : VUES;
+          const base = imagePrompt(m.piece, m.consigne, type);
+          const viewPrompts = vues.map((_, k) => prompts[`${i}-${k}`] ?? viewPrompt(base, k));
+          const used = n3d[type];
+          const max = TYPES_3D[type].max;
           const model = imageModels[i] ?? DEFAULT_IMAGE_MODEL;
-          const imageCost = IMAGE_MODELS[model].credits * VUES.length;
+          const imageCost = IMAGE_MODELS[model].credits * vues.length;
           return (
             <li key={i} className="piece">
               <h3 className="piece-head">
-                {i + 1}. {m.piece}
+                {i + 1}. {m.piece} {type === "sticker" && <span className="chip on">Sticker</span>}
               </h3>
               <p className="sub">
                 {m.consigne} · photo « {m.photo} »
@@ -100,7 +105,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                   )}
                 </div>
                 <div className="piece-prompt">
-                  {VUES.map((v, k) => (
+                  {vues.map((v, k) => (
                     <label key={v.key}>
                       <span className="sub">
                         Prompt de l&apos;image {k + 1} · {v.label}
@@ -125,7 +130,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                   className="cta"
                   disabled={Boolean(busy) || !crop || imgRunning || nImg >= MAX_IMAGES}
                   onClick={() =>
-                    act(`img${i}`, { piece: i, action: "image", prompt: base, prompts: viewPrompts, model }, `Lancer 2 images Meshy, de face et de côté (${imageCost} crédits) pour « ${m.piece} » ?`)
+                    act(`img${i}`, { piece: i, action: "image", prompt: base, prompts: viewPrompts, model }, `Lancer ${vues.length > 1 ? "2 images Meshy, de face et de côté" : "1 image Meshy, de face"} (${imageCost} crédits) pour « ${m.piece} » ?`)
                   }
                 >
                   {busy === `img${i}` ? "Envoi…" : imgRunning ? "Images en cours…" : okImages.length ? "1. Refaire les images" : "1. Faire les images"} ·{" "}
@@ -133,13 +138,13 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                 </button>
                 <button
                   className="cta"
-                  disabled={Boolean(busy) || pickedImg === undefined || modelRunning || n3d >= MAX_3D}
+                  disabled={Boolean(busy) || pickedImg === undefined || modelRunning || used >= max}
                   onClick={() =>
-                    act(`3d${i}`, { piece: i, action: "3d" }, `Lancer une génération 3D Meshy payante pour « ${m.piece} » ? (${n3d}/${MAX_3D} déjà utilisées)`)
+                    act(`3d${i}`, { piece: i, action: "3d" }, `Lancer une génération 3D Meshy payante pour « ${m.piece} » ? (${used}/${max} ${TYPES_3D[type].label.toLowerCase()}s déjà faits)`)
                   }
                 >
                   {busy === `3d${i}` ? "Envoi…" : modelRunning ? "3D en cours…" : okModels.length ? "2. Refaire la pièce 3D" : "2. Faire la pièce 3D"} · ≈{" "}
-                  {CREDITS["3d"]} cr.
+                  {CREDITS["3d"] + (type === "sticker" ? 10 : 0)} cr.
                 </button>
               </div>
 

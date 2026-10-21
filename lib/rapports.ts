@@ -278,7 +278,7 @@ export async function rapport2(id: string, views: string[], glb: string) {
 
 /** Plafond strict : au maximum 4 pièces Meshy par commande. */
 /** Nombre maximum de pièces listées pour Meshy (la 3D reste plafonnée à 4 générations par commande). */
-export const MAX_PIECES = 8;
+export const MAX_PIECES = 10;
 
 export const Rapport3 = z.object({
   resume: z.string().describe("2 phrases : la V2 ressemble-t-elle vraiment à la voiture, et qu'est-ce qui manque surtout."),
@@ -288,7 +288,7 @@ export const Rapport3 = z.object({
       ou: z.string(),
       importance: z
         .enum(["essentiel", "secondaire"])
-        .describe("essentiel = sans ça, on ne reconnaît pas SA voiture ; secondaire = un petit détail qu'on peut laisser (sticker arrière, petit logo).")
+        .describe("essentiel = sans ça, on ne reconnaît pas SA voiture ; secondaire = un petit détail (antenne, petit logo) ; les stickers visibles ne sont plus secondaires : on les refait.")
         .catch("secondaire"),
       solution: z
         .enum(["meshy", "blender", "decalque", "ignorer"])
@@ -299,6 +299,10 @@ export const Rapport3 = z.object({
   meshy: z
     .array(
       z.object({
+        type: z
+          .enum(["piece", "sticker"])
+          .describe("piece = élément en volume (roue, aileron, échappement…) ; sticker = décor plat collé sur la carrosserie (2 au maximum).")
+          .catch("piece"),
         piece: z.string().describe("L'élément COMPLET à faire refaire par Meshy, un seul par ligne (ex. roue avant gauche complète : jante + pneu)."),
         photo: z.string().describe("Le nom exact de la photo du client où la pièce se voit le mieux, de 3/4 de préférence (ex. avant-gauche)."),
         cadre: z
@@ -307,7 +311,7 @@ export const Rapport3 = z.object({
         consigne: z.string().describe("Ce que Meshy doit refaire exactement : forme, nombre de branches, détails. Pour une roue : jante ET pneu montés ensemble."),
       })
     )
-    .describe(`Les pièces essentielles à générer avec Meshy, ${MAX_PIECES} au maximum, la plus importante d'abord.`),
+    .describe(`Les pièces essentielles et les stickers (2 au maximum) à générer avec Meshy, ${MAX_PIECES} lignes au maximum, le plus important d'abord.`),
 });
 export type Rapport3 = z.infer<typeof Rapport3>;
 export type Rapport3Rec = Rec<Rapport3> & { crops?: (string | null)[] };
@@ -318,13 +322,16 @@ On te montre 4 vues de la V2 de la miniature (le modèle de base repeint puis re
 Ta tâche : vérifier ce qui manque encore (logos, badges, jantes, pneus, aileron, échappement, prises d'air, feux…) et en faire la liste complète.
 Le but : la miniature doit VRAIMENT ressembler à la voiture du client, sans être identique au millimètre. Classe chaque manque :
 - essentiel : sans lui, le client ne reconnaît pas sa voiture (jantes différentes, aileron, kit carrosserie, badge très visible) ;
-- secondaire : un détail qu'on peut laisser tomber (un sticker à l'arrière, un petit logo, une antenne).
+- secondaire : un petit détail (une antenne, un petit logo).
+Les stickers et décors visibles (bandes, autocollants, numéros) ne sont PAS à laisser tomber : la miniature doit avoir à peu près tout.
 Ensuite, liste (${MAX_PIECES} au maximum, la plus importante d'abord) les pièces essentielles à faire générer en 3D par Meshy, d'après UNE photo chacune :
 - prends la photo où la pièce se voit le mieux, de 3/4 de préférence (Meshy reconstruit mieux en 3/4) ;
 - donne le rectangle de la pièce dans cette photo : on recadre la photo dessus, car Meshy refait l'objet principal de l'image ;
 - toujours l'élément COMPLET : une roue = la jante ET son pneu (jamais la jante seule) ; un aileron avec ses pieds ; etc. ;
 - une pièce par ligne ; pour des roues identiques, une seule roue suffit (on la copiera sur les 4).
-Si rien d'essentiel ne manque, laisse la liste meshy vide.`;
+Ajoute aussi à la liste meshy les stickers visibles, 2 au maximum (les plus grands ou les plus reconnaissables d'abord), avec type « sticker » :
+le cadre serre le sticker seul, la consigne décrit son dessin, ses couleurs et où il se pose. Les autres stickers : solution « decalque ».
+Si rien d'essentiel ne manque et qu'il n'y a pas de sticker, laisse la liste meshy vide.`;
 
 /** Recadre la photo sur la pièce (avec une marge) pour que Meshy ne refasse pas toute la voiture. */
 async function crop(id: string, i: number, pathname: string, c: { x: number; y: number; l: number; h: number }) {
@@ -375,7 +382,9 @@ export async function rapport3(id: string, views: string[], glb: string) {
       },
     },
     async (res) => {
-      res.meshy = res.meshy.slice(0, MAX_PIECES);
+      // Au plus 2 stickers (leur propre plafond chez Meshy), et MAX_PIECES lignes en tout.
+      let stickers = 0;
+      res.meshy = res.meshy.filter((m) => m.type !== "sticker" || ++stickers <= 2).slice(0, MAX_PIECES);
       // Un recadrage raté ne bloque pas le rapport : la pièce reste listée, sans image à envoyer.
       const crops = await Promise.all(
         res.meshy.map((m, i) => {
@@ -435,14 +444,15 @@ C'est le contrôle avant d'envoyer le rendu au client. Donne un score de ressemb
 - roues (jantes, pneus, taille, position) : 20 points ;
 - éléments distinctifs (aileron, kit, prises d'air, échappement, feux, badges visibles) : 20 points ;
 - détails (rétros, bandes, petits éléments) : 10 points.
-Plus de ${CONTROLE.seuil} seulement si le client reconnaît SA voiture au premier coup d'œil et qu'il ne reste rien de bloquant. Ne gonfle pas le score : un humain s'en sert pour décider d'envoyer ou non.
+Plus de ${CONTROLE.seuil} seulement si le client reconnaît SA voiture au premier coup d'œil, qu'il ne reste rien de bloquant et qu'à peu près TOUT y est,
+petits détails compris : les stickers visibles (2 sont refaits en 3D, les autres en décalque) doivent être présents et au bon endroit. Un sticker ou un détail visible absent fait perdre des points. Ne gonfle pas le score : un humain s'en sert pour décider d'envoyer ou non.
 Si le score ne dépasse pas ${CONTROLE.seuil}, liste TOUS les écarts, du plus grave au moins grave, chacun avec une consigne de correction précise.
 Si un contrôle précédent t'est donné, vérifie d'abord si ses écarts ont été corrigés, et reste cohérent dans ta notation.`;
 
 const essaisPath = (id: string) => file(id, "controle-essais");
 export const readEssais = async (id: string) => (await readJson<ControleEssai[]>(essaisPath(id))) ?? [];
 
-export async function controle(id: string, views: string[], glb: string, meshyRestant: number) {
+export async function controle(id: string, views: string[], glb: string, meshyRestant: { pieces: number; stickers: number }) {
   const demande = await readDemande(id);
   if (!demande) throw new Error("Demande introuvable");
   const essais = await readEssais(id);
@@ -456,7 +466,13 @@ export async function controle(id: string, views: string[], glb: string, meshyRe
       content: async () => {
         const { blocks } = await photoBlocks(demande.files, 16);
         return [
-          { type: "text", text: `Voiture : ${demande.car || "non précisée"}. Essai n° ${essais.length + 1}. Générations Meshy encore possibles pour cette commande : ${meshyRestant}${meshyRestant ? "" : " (ne propose pas de correction meshy)"}.` },
+          {
+            type: "text",
+            text:
+              `Voiture : ${demande.car || "non précisée"}. Essai n° ${essais.length + 1}. ` +
+              `Générations Meshy encore possibles : ${meshyRestant.pieces} pièce(s), ${meshyRestant.stickers} sticker(s). ` +
+              `Ne propose une correction meshy que s'il en reste pour cette sorte d'élément ; sinon blender ou decalque.`,
+          },
           prev?.result
             ? { type: "text", text: `Contrôle précédent (${prev.result.score} %) :\n${JSON.stringify(prev.result.ecarts)}` }
             : { type: "text", text: "Premier contrôle." },
