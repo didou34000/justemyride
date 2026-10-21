@@ -981,3 +981,7 @@ ol.pieces { list-style: none; padding: 0; }
 .piece-set-vues figcaption { font-size: 12px; color: var(--muted); text-align: center; }
 @media (max-width: 560px) { .piece-set-vues { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .piece-row { grid-template-columns: 1fr; } }
+
+/* Connexion client (étape « Ton compte ») */
+.or { text-align: center; font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+.turnstile { margin: 0 0 14px; min-height: 65px; }

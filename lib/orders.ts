@@ -1,4 +1,4 @@
-import { del, list } from "@vercel/blob";
+import { deletePrefix, listFiles } from "@/lib/store";
 import { readJson, writeJson } from "@/lib/blobJson";
 import { claudeConfigured, stale, type Rec } from "@/lib/claude";
 import { readBase, type BaseRecord } from "@/lib/base";
@@ -26,6 +26,8 @@ export type Demande = {
   base?: Base | null;
   size?: string;
   receivedAt?: string;
+  /** Aperçu payé 5 € par le client (pas son premier) : à déduire du prix de la miniature. */
+  apercuPaye?: boolean;
   files: { slot: string; pathname: string }[];
 };
 
@@ -149,15 +151,10 @@ export async function getOrder(id: string): Promise<Order | null> {
 /** Toutes les demandes, la plus récente d'abord. */
 export async function listOrders(): Promise<Order[]> {
   const ids = new Set<string>();
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix: "submissions/", cursor, limit: 1000 });
-    for (const b of page.blobs) {
-      const m = b.pathname.match(/^submissions\/([\w-]+)\/demande\.json$/);
-      if (m) ids.add(m[1]);
-    }
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
+  for (const p of await listFiles("submissions/")) {
+    const m = p.match(/^submissions\/([\w-]+)\/demande\.json$/);
+    if (m) ids.add(m[1]);
+  }
   const orders = (await Promise.all([...ids].map(getOrder))).filter((o): o is Order => Boolean(o));
   return orders.sort((a, b) => (b.demande.receivedAt ?? b.id).localeCompare(a.demande.receivedAt ?? a.id));
 }
@@ -175,14 +172,5 @@ export async function setManualStep(id: string, step: ManualStep, done: boolean)
  * Les compteurs de plafonds (analyse/, meshy/) ne sont pas dans submissions/ : ils restent.
  */
 export async function deleteOrders(id?: string) {
-  const prefix = id ? `submissions/${id}/` : "submissions/";
-  let cursor: string | undefined;
-  let count = 0;
-  do {
-    const page = await list({ prefix, cursor, limit: 1000 });
-    if (page.blobs.length) await del(page.blobs.map((b) => b.url));
-    count += page.blobs.length;
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return count;
+  return deletePrefix(id ? `submissions/${id}/` : "submissions/");
 }

@@ -1,6 +1,5 @@
-import { put } from "@vercel/blob";
 import { readJson, writeJson } from "@/lib/blobJson";
-import { BLOB_ACCESS } from "@/lib/storage";
+import { putFile } from "@/lib/store";
 import { download, licenceOk, model } from "@/lib/sketchfab";
 import { cars } from "@/lib/cars";
 import { readDemande, stale } from "@/lib/claude";
@@ -67,13 +66,7 @@ export async function fetchBase(id: string, uid?: string): Promise<BaseRecord> {
     // Allégé avant stockage (textures surtout) : 2 copies par demande (base + couleurs), le stockage Blob se remplissait vite.
     r.sizeMbOriginal = Math.round(bytes.byteLength / 1e5) / 10;
     bytes = await writeGlb(await slimGlb(await readGlb(bytes)));
-    const blob = await put(`submissions/${id}/base.glb`, Buffer.from(bytes), {
-      access: BLOB_ACCESS,
-      contentType: "model/gltf-binary",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      multipart: bytes.byteLength > 20 * 1024 * 1024,
-    });
+    const blob = await putFile(`submissions/${id}/base.glb`, bytes, "model/gltf-binary");
     r.glb = blob.pathname;
     r.sizeMb = Math.round(bytes.byteLength / 1e5) / 10;
     r.status = "done";
