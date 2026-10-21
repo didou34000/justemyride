@@ -235,7 +235,7 @@ export default function AdminDemande({ order }: { order: Order }) {
                   {base?.label}
                   {base?.author && ` · par ${base.author}`}
                   {base?.licence && ` · licence ${base.licence}`}
-                  {base?.sizeMb && ` · ${base.sizeMb} Mo`}
+                  {base?.sizeMb && ` · ${base.sizeMb} Mo${base.sizeMbOriginal ? ` (${base.sizeMbOriginal} Mo avant allègement)` : ""}`}
                   {base?.uid && (
                     <>
                       {" · "}

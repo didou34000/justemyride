@@ -28,6 +28,28 @@ type ReqId = (typeof REQUIRED)[number]["id"];
 type Step = "car" | "photos" | "contact";
 type Phase = "idle" | "sending" | "done" | "error";
 
+/**
+ * Réduit une photo avant l'envoi (2560 px de côté au plus, JPEG) : 1 à 2 Mo au lieu de 5 à 15, largement assez pour l'analyse
+ * et les recadrages. Si le navigateur ne sait pas la lire (HEIC hors Safari), on envoie l'original.
+ */
+async function shrinkPhoto(file: File): Promise<File> {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.type === "image/jpeg" && file.size < 3e6) return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.88));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 const isImage = (f: File) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name);
 
 /** `size` : la taille choisie sur la fiche produit, gardée avec la demande (le client peut encore la changer à la commande). */
@@ -88,10 +110,12 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
     setPhase("sending");
     setError("");
     setProgress(0);
-    const files = [
-      ...REQUIRED.map((r) => ({ slot: r.id as string, file: req[r.id]! })),
-      ...extra.map((file, i) => ({ slot: `photo-${i + 1}`, file })),
-    ];
+    const files = await Promise.all(
+      [
+        ...REQUIRED.map((r) => ({ slot: r.id as string, file: req[r.id]! })),
+        ...extra.map((file, i) => ({ slot: `photo-${i + 1}`, file })),
+      ].map(async ({ slot, file }) => ({ slot, file: await shrinkPhoto(file) }))
+    );
     const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
 
     try {

@@ -3,7 +3,8 @@
 export const BLOB_ACCESS: "public" | "private" =
   process.env.NEXT_PUBLIC_BLOB_ACCESS === "public" ? "public" : "private";
 
-export const MAX_FILE_BYTES = 500 * 1024 * 1024;
+/** Par photo : elles sont réduites dans le navigateur avant l'envoi, cette limite ne sert que si la réduction échoue. */
+export const MAX_FILE_BYTES = 30 * 1024 * 1024;
 export const ALLOWED_TYPES = ["image/*"];
 
 /**
