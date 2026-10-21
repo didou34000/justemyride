@@ -7,11 +7,15 @@ import {
 } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { ALLOWED_TYPES, MAX_FILE_BYTES, storageMode } from "@/lib/storage";
+import { presignUpload } from "@/lib/store";
+import { authConfigured, userFromRequest } from "@/lib/clients";
 
 /**
  * Autorise un envoi direct navigateur → Vercel Blob (pas de limite de taille de requête).
  * Mode "token" : jeton client signé avec BLOB_READ_WRITE_TOKEN.
  * Mode "oidc"  : URL présignée, obtenue avec le jeton OIDC de Vercel et BLOB_STORE_ID.
+ * Mode "r2"    : URL présignée Cloudflare R2. Body : { pathname, contentType }.
+ * Quand la connexion client est branchée (Supabase), seul un client connecté peut envoyer.
  */
 export async function POST(request: Request) {
   const mode = storageMode();
@@ -19,11 +23,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stockage non configuré" }, { status: 503 });
   }
 
+  if (authConfigured() && !(await userFromRequest(request))) {
+    return NextResponse.json({ error: "Connecte-toi pour envoyer tes photos" }, { status: 401 });
+  }
+
   const checkPath = (pathname: string) => {
-    if (!pathname.startsWith("submissions/")) throw new Error("Chemin refusé");
+    if (!/^submissions\/[\w-]{6,40}\/[\w-]+\.\w{2,5}$/.test(pathname)) throw new Error("Chemin refusé");
   };
 
   try {
+    if (mode === "r2") {
+      const { pathname, contentType } = await request.json();
+      checkPath(String(pathname));
+      if (!String(contentType).startsWith("image/")) throw new Error("Type de fichier refusé");
+      return NextResponse.json(await presignUpload(pathname));
+    }
+
     if (mode === "token") {
       const body = (await request.json()) as HandleUploadBody;
       const json = await handleUpload({

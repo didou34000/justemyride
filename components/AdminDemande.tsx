@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { upload, uploadPresigned } from "@vercel/blob/client";
-import { BLOB_ACCESS } from "@/lib/storage";
+import { sendFile } from "@/lib/uploadClient";
 import { useRouter } from "next/navigation";
 import { Flow, StepIcon } from "./Flow";
 import { photoSrc } from "@/lib/photo";
@@ -146,12 +145,11 @@ export default function AdminDemande({ order }: { order: Order }) {
     if (!file) return;
     await run(kind === "base" ? "base" : kind, async () => {
       const { mode } = await fetch("/api/storage").then((r) => r.json());
-      const send = mode === "oidc" ? uploadPresigned : upload;
-      const blob = await send(`submissions/${id}/${kind}.glb`, file, {
-        access: BLOB_ACCESS,
+      if (!mode) throw new Error("Stockage non configuré");
+      const blob = await sendFile(`submissions/${id}/${kind}.glb`, file, {
+        mode,
         handleUploadUrl: "/api/admin/upload",
         contentType: "model/gltf-binary",
-        multipart: mode === "token" && file.size > 20 * 1024 * 1024,
       });
       return post("/api/admin/fichier", { id, kind, pathname: blob.pathname });
     });
@@ -189,6 +187,7 @@ export default function AdminDemande({ order }: { order: Order }) {
           <p className="sub">
             <a className="link" href={`mailto:${demande.email}`}>{demande.email}</a>
             {demande.size && ` · taille ${demande.size.replace("-", ":")}`}
+            {demande.apercuPaye && " · aperçu payé 5 €, à déduire de la miniature"}
           </p>
         </div>
         <span className="admin-top-r">

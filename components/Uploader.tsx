@@ -1,14 +1,18 @@
 "use client";
 
-import { upload, uploadPresigned } from "@vercel/blob/client";
 import { useEffect, useMemo, useState } from "react";
 import CarPicker from "./CarPicker";
+import ClientLogin, { type ClientStatus } from "./ClientLogin";
 import type { Base } from "@/lib/catalog";
 import { track } from "@vercel/analytics";
-import { BLOB_ACCESS, type StorageMode } from "@/lib/storage";
+import type { StorageMode } from "@/lib/storage";
+import { sendFile } from "@/lib/uploadClient";
+import { authConfigured } from "@/lib/authShared";
+import { authHeaders } from "@/lib/supabaseClient";
 
 /*
  * Envoi d'une voiture en 3 étapes : la voiture, les photos (6 vues guidées, puis autant qu'on veut), le contact.
+ * Quand la connexion client est branchée, une étape « Ton compte » passe avant (1 aperçu gratuit par personne).
  * Les noms des fichiers (« avant », « avant-gauche », « gauche », « droite », « arriere-droite », « arriere », « photo-N »)
  * sont lus par l'admin et par les rapports de Claude.
  */
@@ -25,7 +29,7 @@ const MAX_EXTRA = 78;
 const PARALLEL = 4;
 
 type ReqId = (typeof REQUIRED)[number]["id"];
-type Step = "car" | "photos" | "contact";
+type Step = "compte" | "car" | "photos" | "contact";
 type Phase = "idle" | "sending" | "done" | "error";
 
 /**
@@ -55,7 +59,9 @@ const isImage = (f: File) => f.type.startsWith("image/") || /\.(heic|heif)$/i.te
 /** `size` : la taille choisie sur la fiche produit, gardée avec la demande (le client peut encore la changer à la commande). */
 /** `config` : les choix faits dans le configurateur 3D, s'il en vient (jantes, couleur…), joints à la demande. */
 export default function Uploader({ size, config }: { size?: string; config?: Record<string, unknown> | null } = {}) {
-  const [step, setStep] = useState<Step>("car");
+  const auth = authConfigured();
+  const [step, setStep] = useState<Step>(auth ? "compte" : "car");
+  const [account, setAccount] = useState<ClientStatus | null>(null);
   const [base, setBase] = useState<Base | null>(null);
   const [car, setCar] = useState("");
   const [req, setReq] = useState<Partial<Record<ReqId, File>>>({});
@@ -132,32 +138,31 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
       const totalBytes = files.reduce((s, f) => s + f.file.size, 0);
       const loaded: Record<string, number> = {};
       // Envoi par lots de PARALLEL photos : un client peut en mettre des dizaines.
-      const uploaded: { slot: string; url: string; pathname: string }[] = [];
+      const uploaded: { slot: string; pathname: string }[] = [];
+      const headers = auth ? await authHeaders() : {};
       let next = 0;
       async function worker() {
         while (next < files.length) {
           const { slot, file } = files[next++];
           const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-          // Connexion Blob actuelle (OIDC) : envoi par URL présignée, en une seule requête.
-          const put = mode === "oidc" ? uploadPresigned : upload;
-          const blob = await put(`submissions/${id}/${slot}.${ext}`, file, {
-            access: BLOB_ACCESS,
+          const blob = await sendFile(`submissions/${id}/${slot}.${ext}`, file, {
+            mode: mode!,
             handleUploadUrl: "/api/upload",
-            multipart: mode === "token" && file.size > 20 * 1024 * 1024,
-            onUploadProgress: (e) => {
-              loaded[slot] = e.loaded;
+            headers,
+            onProgress: (n) => {
+              loaded[slot] = n;
               const sum = Object.values(loaded).reduce((a, b) => a + b, 0);
               setProgress(Math.min(99, Math.round((sum / totalBytes) * 100)));
             },
           });
-          uploaded.push({ slot, url: blob.url, pathname: blob.pathname });
+          uploaded.push({ slot, pathname: blob.pathname });
         }
       }
       await Promise.all(Array.from({ length: Math.min(PARALLEL, files.length) }, worker));
 
       const res = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ id, email, car, base, size, ...(config ? { config } : {}), mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
@@ -192,9 +197,10 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
   }
 
   const steps: { id: Step; label: string }[] = [
+    ...(auth ? [{ id: "compte" as Step, label: "Ton compte" }] : []),
     { id: "car", label: "Ta voiture" },
     { id: "photos", label: "Tes photos" },
-    { id: "contact", label: "Ton e-mail" },
+    { id: "contact", label: auth ? "Envoi" : "Ton e-mail" },
   ];
   const cur = steps.findIndex((s) => s.id === step);
 
@@ -208,6 +214,16 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
           </li>
         ))}
       </ol>
+
+      {step === "compte" && (
+        <ClientLogin
+          onReady={(st) => {
+            setAccount(st);
+            setEmail(st.email);
+            setStep("car");
+          }}
+        />
+      )}
 
       {step === "car" && (
         <CarPicker
@@ -315,7 +331,7 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
 
       {step === "contact" && (
         <div className="contact">
-          <h2 className="wz-title">Où t'envoyer ton aperçu 3D ?</h2>
+          <h2 className="wz-title">{account ? "Dernière étape" : "Où t'envoyer ton aperçu 3D ?"}</h2>
           <p className="wz-tip">On t'écrit dès qu'il est prêt.</p>
           <div className="up-fields">
             <label>
@@ -324,7 +340,7 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
             </label>
             <label>
               Ton e-mail
-              <input type="email" autoComplete="email" placeholder="prenom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input type="email" autoComplete="email" placeholder="prenom@exemple.fr" value={email} readOnly={Boolean(account)} onChange={(e) => setEmail(e.target.value)} />
             </label>
           </div>
           <label className="consent">
@@ -337,7 +353,7 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
               ).
             </span>
           </label>
-          <button className="cta full" disabled={!reqDone || !emailOk || !consent || storage === null || phase === "sending"} onClick={send}>
+          <button className="cta full" disabled={!reqDone || !emailOk || !consent || storage === null || (auth && !account) || phase === "sending"} onClick={send}>
             {phase === "sending" ? `Envoi… ${progress} %` : "Envoyer ma voiture"}
           </button>
           {phase === "sending" && (

@@ -9,9 +9,10 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/adminAuth";
 import { FICHIERS } from "@/lib/fichiers";
 import { storageMode } from "@/lib/storage";
+import { presignUpload } from "@/lib/store";
 
 /**
- * Envoi direct navigateur → Vercel Blob pour le propriétaire (image des logos, miniature assemblée).
+ * Envoi direct navigateur → stockage (Vercel Blob ou R2) pour le propriétaire (image des logos, miniature assemblée).
  * Même principe que /api/upload, mais réservé à l'admin et limité aux fichiers de lib/fichiers.
  */
 const TYPES = ["image/*", "model/gltf-binary", "application/octet-stream"];
@@ -28,6 +29,11 @@ export async function POST(request: Request) {
   };
 
   try {
+    if (mode === "r2") {
+      const { pathname } = await request.json();
+      checkPath(String(pathname));
+      return NextResponse.json(await presignUpload(pathname));
+    }
     if (mode === "token") {
       const body = (await request.json()) as HandleUploadBody;
       const json = await handleUpload({
