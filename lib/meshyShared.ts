@@ -1,6 +1,6 @@
 /** Plafonds par commande, échecs compris : générations 3D et dessins (tous deux payants chez Meshy). */
 export const MAX_3D = 4;
-/** Dessins comptés image par image (une image 3/4 par clic). */
+/** Dessins comptés image par image (2 images par clic). */
 export const MAX_IMAGES = 12;
 /**
  * Tarif Meshy (docs.meshy.ai/api/pricing, oct. 2026) : une vue dessinée nano-banana 3 crédits (nano-banana-pro 9) ;
@@ -19,14 +19,24 @@ export const isImageModel = (m: unknown): m is ImageModel => typeof m === "strin
 /** Prix d'une vue pour un job (les anciens jobs sans modèle étaient en Pro). */
 export const viewCredits = (j: { model?: string }) => (isImageModel(j.model) ? IMAGE_MODELS[j.model].credits : IMAGE_MODELS["nano-banana-pro"].credits);
 
-/** Une seule image dessinée par pièce : la vue 3/4. */
+/**
+ * Deux images dessinées par pièce, chacune avec son prompt : de face (l'élément complet), puis de côté d'après
+ * l'image de face (même objet), pour montrer la largeur (pour une roue : la largeur du pneu). La 3D part des deux.
+ */
 export const VUES = [
   {
-    key: "34",
-    label: "3/4 avant",
+    key: "face",
+    label: "De face",
     prompt:
-      "THREE-QUARTER VIEW, camera at 45°: the object is rotated about 45° away from the camera, so we see its front face AND its side (its thickness) at the same time, in perspective. " +
-      "NOT a front view, NOT a flat face-on view, NOT a profile view. For a wheel: the rim face is seen as an ellipse and the tyre tread is clearly visible on one side.",
+      "IMAGE 1 of 2, FRONT VIEW: the complete element seen straight on, centered, filling most of the frame. " +
+      "For a wheel: the whole rim face with the tyre all around it.",
+  },
+  {
+    key: "cote",
+    label: "De côté",
+    prompt:
+      "IMAGE 2 of 2, SIDE VIEW: the same object rotated 90°, seen exactly in profile, showing its full width and thickness. " +
+      "For a wheel: the tyre tread seen edge-on, so its real width is visible, with the edge of the rim.",
   },
 ] as const;
 const SAME =
@@ -35,7 +45,7 @@ const SAME =
 export const viewPrompt = (base: string, k: number) => `${VUES[k].prompt}${k ? ` ${SAME}` : ""}\n${base}`;
 
 /**
- * Le prompt de base envoyé au modèle d'image de Meshy pour dessiner une pièce seule (l'angle 3/4 s'ajoute devant, voir VUES).
+ * Le prompt de base envoyé au modèle d'image de Meshy pour dessiner une pièce seule (l'angle de chaque image s'ajoute devant, voir VUES).
  * Partagé avec la page admin, qui l'affiche et permet de le corriger avant d'envoyer.
  */
 export const imagePrompt = (piece: string, consigne: string) =>
@@ -65,8 +75,10 @@ export type PieceJob = {
   /** Ancien format (dessin puis 3D enchaînés) : lu seulement. */
   stage?: "image" | "3d";
   crop: string;
-  /** Le prompt envoyé (dessin). */
+  /** Le prompt de base (dessin). */
   prompt?: string;
+  /** Le prompt complet de chaque image, dans l'ordre de VUES (corrigé dans l'admin). */
+  prompts?: string[];
   /** Le modèle d'image utilisé (dessin). */
   model?: string;
   /** Le dessin produit (job image : la 1re vue) ou utilisé (job 3D). */
