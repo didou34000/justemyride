@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { photoSrc } from "@/lib/photo";
 import GlbViewer from "./GlbViewer";
-import { CREDITS, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, MAX_3D, MAX_IMAGES, VUES, type PieceJob, type Pieces, type Vue } from "@/lib/meshyShared";
+import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, MAX_3D, MAX_IMAGES, VUES, type PieceJob, type Pieces, type Vue } from "@/lib/meshyShared";
 import type { Rapport3 } from "@/lib/rapports";
 
 /**
@@ -21,11 +21,12 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [prompts, setPrompts] = useState<Record<number, string>>({});
+  const [imageModels, setImageModels] = useState<Record<number, ImageModel>>({});
   const n3d = pieces.jobs.filter((j) => jobKind(j) === "3d").length;
   const nImg = pieces.jobs.reduce((t, j) => t + imageCount(j), 0);
   // Crédits réellement facturés quand Meshy les donne, sinon le tarif (un échec est remboursé).
   const cost = (j: PieceJob) =>
-    j.credits || (jobFailed(j) ? 0 : jobKind(j) === "image" ? CREDITS.image * (j.vues?.filter((v) => !jobFailedVue(v)).length ?? 1) : CREDITS["3d"]);
+    j.credits || (jobFailed(j) ? 0 : jobKind(j) === "image" ? viewCredits(j) * (j.vues?.filter((v) => !jobFailedVue(v)).length ?? 1) : CREDITS["3d"]);
   const total = pieces.jobs.reduce((t, j) => t + cost(j), 0);
 
   async function act(key: string, body: object, confirm?: string) {
@@ -56,7 +57,8 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
         des 3 vues. Tu retiens ensuite la meilleure 3D. Payant : {n3d}/{MAX_3D} générations 3D et {nImg}/{MAX_IMAGES} vues dessinées utilisées pour cette commande.
       </p>
       <p className="sub">
-        Prix : une série de 3 vues = {CREDITS.image * VUES.length} crédits ({CREDITS.image} par vue), une 3D ≈ {CREDITS["3d"]} crédits (le vrai montant s&apos;affiche une fois
+        Prix : une série de 3 vues = {IMAGE_MODELS["nano-banana"].credits * VUES.length} crédits en Standard ({IMAGE_MODELS["nano-banana"].credits} par vue),{" "}
+        {IMAGE_MODELS["nano-banana-pro"].credits * VUES.length} en Pro ; une 3D ≈ {CREDITS["3d"]} crédits (le vrai montant s&apos;affiche une fois
         facturé). Dépensé sur cette commande : <b>{total} crédits</b>.
       </p>
       {error && <p className="notice err">{error}</p>}
@@ -73,6 +75,8 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
           const imgRunning = images.some(({ j }) => jobKind(j) === "image" && !jobDone(j));
           const modelRunning = models.some(({ j }) => !jobDone(j));
           const prompt = prompts[i] ?? imagePrompt(m.piece, m.consigne);
+          const model = imageModels[i] ?? DEFAULT_IMAGE_MODEL;
+          const seriesCost = IMAGE_MODELS[model].credits * VUES.length;
           return (
             <li key={i} className="piece">
               <h3 className="piece-head">
@@ -106,15 +110,25 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                 </label>
               </div>
               <div className="admin-actions">
+                <label className="sub">
+                  Modèle des vues{" "}
+                  <select value={model} onChange={(e) => setImageModels((p) => ({ ...p, [i]: e.target.value as ImageModel }))}>
+                    {Object.entries(IMAGE_MODELS).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.label} · {v.credits * VUES.length} cr.
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   className="cta"
                   disabled={Boolean(busy) || !crop || imgRunning || nImg >= MAX_IMAGES}
                   onClick={() =>
-                    act(`img${i}`, { piece: i, action: "image", prompt }, `Lancer 3 vues dessinées Meshy (${CREDITS.image * VUES.length} crédits) pour « ${m.piece} » ?`)
+                    act(`img${i}`, { piece: i, action: "image", prompt, model }, `Lancer 3 vues dessinées Meshy (${seriesCost} crédits) pour « ${m.piece} » ?`)
                   }
                 >
                   {busy === `img${i}` ? "Envoi…" : imgRunning ? "Vues en cours…" : okImages.length ? "1. Refaire les images" : "1. Faire les images"} ·{" "}
-                  {CREDITS.image * VUES.length} cr.
+                  {seriesCost} cr.
                 </button>
                 <button
                   className="cta"
