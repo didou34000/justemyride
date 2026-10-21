@@ -1,5 +1,14 @@
 /** Plafonds par commande, échecs compris : générations 3D et dessins (tous deux payants chez Meshy). */
 export const MAX_3D = 4;
+/** Les sortes d'éléments faits en 3D par Meshy, chacune avec son propre plafond de générations 3D par commande. */
+export const TYPES_3D = {
+  piece: { label: "Pièce", max: MAX_3D },
+  sticker: { label: "Sticker", max: 2 },
+} as const;
+export type Type3D = keyof typeof TYPES_3D;
+export const isType3D = (t: unknown): t is Type3D => typeof t === "string" && t in TYPES_3D;
+/** Générations 3D déjà faites (échecs compris) pour une sorte d'élément ; les anciens jobs sans sorte sont des pièces. */
+export const count3dOf = (p: { jobs: PieceJob[] }, t: Type3D) => p.jobs.filter((j) => jobKind(j) === "3d" && (j.type ?? "piece") === t).length;
 /** Dessins comptés image par image (2 images par clic). */
 export const MAX_IMAGES = 12;
 /**
@@ -48,7 +57,16 @@ export const viewPrompt = (base: string, k: number) => `${VUES[k].prompt}${k ? `
  * Le prompt de base envoyé au modèle d'image de Meshy pour dessiner une pièce seule (l'angle de chaque image s'ajoute devant, voir VUES).
  * Partagé avec la page admin, qui l'affiche et permet de le corriger avant d'envoyer.
  */
-export const imagePrompt = (piece: string, consigne: string) =>
+export const imagePrompt = (piece: string, consigne: string, type: Type3D = "piece") =>
+  type === "sticker" ? stickerPrompt(piece, consigne) : partPrompt(piece, consigne);
+
+const stickerPrompt = (piece: string, consigne: string) =>
+  `Recreate the ${piece} (a sticker / decal) visible in the reference photo, alone, as a thin flat plate about 1 mm thick: ` +
+  `centered, the whole decal visible and flattened (as if peeled off the car and laid flat), plain white background, soft studio light. ` +
+  `Reproduce its exact outline, graphics, colours and proportions. No car body, no shadow.\n` +
+  `Details (French): ${consigne}`;
+
+const partPrompt = (piece: string, consigne: string) =>
   `Recreate the complete ${piece} visible in the reference photo, alone, as one isolated object: ` +
   `centered, the whole element visible, plain white background, soft studio light, product shot. ` +
   `If it is a wheel or a rim: show the COMPLETE WHEEL, the rim with its tyre mounted on it (tyre sidewall and tread visible), never the rim alone, even if the details below say otherwise. ` +
@@ -70,6 +88,8 @@ export type PieceJob = {
   /** Rang de la pièce dans le 3e rapport. */
   index: number;
   piece: string;
+  /** Sorte d'élément (pièce, sticker) : chacune a son plafond. Absent = pièce. */
+  type?: Type3D;
   /** image = dessin de la pièce seule ; 3d = la pièce en 3D. Absent = ancien job (3D). */
   kind?: "image" | "3d";
   /** Ancien format (dessin puis 3D enchaînés) : lu seulement. */
