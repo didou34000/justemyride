@@ -1,7 +1,9 @@
 import { NodeIO, type Document } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { MeshoptDecoder } from "meshoptimizer";
+import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
 import { unzipSync } from "fflate";
+import { dedup, meshopt, prune, textureCompress } from "@gltf-transform/functions";
+import sharp from "sharp";
 
 /**
  * Lecture et écriture des modèles 3D côté serveur, sans Blender (Vercel ne le fait pas tourner).
@@ -9,8 +11,10 @@ import { unzipSync } from "fflate";
  */
 
 async function io() {
-  await MeshoptDecoder.ready;
-  return new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.decoder": MeshoptDecoder });
+  await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready]);
+  return new NodeIO()
+    .registerExtensions(ALL_EXTENSIONS)
+    .registerDependencies({ "meshopt.decoder": MeshoptDecoder, "meshopt.encoder": MeshoptEncoder });
 }
 
 /** Les modèles compressés (meshopt) sont décompressés à la lecture : on les réécrit sans compression. */
@@ -22,6 +26,27 @@ function dropCompression(doc: Document) {
 export async function readGlb(bytes: Uint8Array) {
   const doc = await (await io()).readBinary(bytes);
   dropCompression(doc);
+  return doc;
+}
+
+/**
+ * Allège un modèle avant de le stocker : doublons et éléments inutilisés retirés, textures ramenées à 2048 px en WebP,
+ * puis compression meshopt (positions quantifiées au ~1/4 mm sur une voiture de 4 m : invisible, même en 1:18).
+ * Le site lit le meshopt partout ; Blender ne le lit pas : décompresser d'abord (readGlb + writeGlb sans compression).
+ */
+export async function slimGlb(doc: Document) {
+  await doc.transform(
+    dedup(),
+    prune(),
+    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [2048, 2048], quality: 85 }),
+    meshopt({ encoder: MeshoptEncoder, level: "medium" })
+  );
+  return doc;
+}
+
+/** Recompresse un modèle relu (readGlb le décompresse) sans retoucher ses textures. */
+export async function compressGlb(doc: Document) {
+  await doc.transform(meshopt({ encoder: MeshoptEncoder, level: "medium" }));
   return doc;
 }
 

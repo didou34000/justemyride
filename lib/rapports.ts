@@ -6,7 +6,7 @@ import { readBytes, readJson } from "@/lib/blobJson";
 import { BLOB_ACCESS } from "@/lib/storage";
 import { imageBlock, photoBlocks, readDemande, runClaude, type Rec } from "@/lib/claude";
 import { readBase } from "@/lib/base";
-import { FINITIONS, materialTable, readGlb, repaint, writeGlb, type Finition, type MatInfo } from "@/lib/glb";
+import { compressGlb, FINITIONS, materialTable, readGlb, repaint, writeGlb, type Finition, type MatInfo } from "@/lib/glb";
 
 /**
  * Les trois passages de Claude, dans l'ordre :
@@ -196,7 +196,8 @@ export async function couleurs(id: string, sheets: { id: string; image: string }
         .filter((m) => m.action === "peindre" && ids.has(m.id))
         .map((m) => ({ id: m.id, couleur: m.couleur, finition: m.finition }));
       const applied = repaint(doc, paints);
-      const bytes = await writeGlb(doc);
+      // readGlb a décompressé le modèle : on le recompresse pour ne pas stocker une copie 4 fois plus lourde.
+      const bytes = await writeGlb(await compressGlb(doc));
       const blob = await put(`submissions/${id}/couleurs.glb`, Buffer.from(bytes), {
         access: BLOB_ACCESS,
         contentType: "model/gltf-binary",

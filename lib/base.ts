@@ -4,7 +4,7 @@ import { BLOB_ACCESS } from "@/lib/storage";
 import { download, licenceOk, model } from "@/lib/sketchfab";
 import { cars } from "@/lib/cars";
 import { readDemande, stale } from "@/lib/claude";
-import { zipToGlb } from "@/lib/glb";
+import { readGlb, slimGlb, writeGlb, zipToGlb } from "@/lib/glb";
 
 /**
  * Étape 1 : le modèle de base. C'est le modèle Sketchfab choisi par le client, et on ne s'en écarte plus :
@@ -23,6 +23,8 @@ export type BaseRecord = {
   /** Le .glb dans le stockage (submissions/<id>/base.glb), ou un fichier public pour le garage. */
   glb?: string;
   sizeMb?: number;
+  /** Poids avant allègement (Mo). */
+  sizeMbOriginal?: number;
   error?: string;
 };
 
@@ -62,6 +64,9 @@ export async function fetchBase(id: string, uid?: string): Promise<BaseRecord> {
     if (!res.ok) throw new Error(`Téléchargement Sketchfab : ${res.status}`);
     let bytes: Uint8Array = new Uint8Array(await res.arrayBuffer());
     if (file.zip) bytes = await zipToGlb(bytes);
+    // Allégé avant stockage (textures surtout) : 2 copies par demande (base + couleurs), le stockage Blob se remplissait vite.
+    r.sizeMbOriginal = Math.round(bytes.byteLength / 1e5) / 10;
+    bytes = await writeGlb(await slimGlb(await readGlb(bytes)));
     const blob = await put(`submissions/${id}/base.glb`, Buffer.from(bytes), {
       access: BLOB_ACCESS,
       contentType: "model/gltf-binary",
