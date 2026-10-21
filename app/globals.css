@@ -967,4 +967,12 @@ ol.pieces { list-style: none; padding: 0; }
 .piece-result.is-picked { border-color: var(--tone, #2e8b73); }
 .piece-result span { font-size: 13px; }
 .piece-result-foot { display: flex; gap: 12px; align-items: center; justify-content: space-between; font-size: 13px; }
+.piece-vues { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+.piece-sets { display: grid; gap: 12px; margin-top: 8px; }
+.piece-set { padding: 8px; border-radius: 14px; border: 2px solid var(--line); display: grid; gap: 8px; }
+.piece-set.is-picked { border-color: var(--tone, #2e8b73); }
+.piece-set-vues { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.piece-set-vues figure { margin: 0; display: grid; gap: 4px; }
+.piece-set-vues figcaption { font-size: 12px; color: var(--muted); text-align: center; }
+@media (max-width: 560px) { .piece-set-vues { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .piece-row { grid-template-columns: 1fr; } }
