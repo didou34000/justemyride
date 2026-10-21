@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { STEPS, type Step, type Tone } from "@/lib/steps";
+import { CONTROLE, STEPS, type Step, type Tone } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 import { photoSrc } from "@/lib/photo";
 
@@ -26,6 +26,7 @@ const ICON: Record<string, ReactNode> = {
   rapport3: <path d="M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M12 11v4M12 17.5v.01" />,
   meshy: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" />,
   retouches: <path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 16.5l9 5 9-5" />,
+  controle: <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6zM8.5 12l2.5 2.5 4.5-5" />,
   rendu: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
   accord: <path d="M3 6h18v12H3zM3 10h18M7 15h4" />,
   impression: <path d="M7 9V3h10v6M7 17H4v-8h16v8h-3M7 14h10v7H7z" />,
@@ -160,6 +161,18 @@ function Preview({ step, order }: { step: Step; order: Order }) {
     case "retouches":
       if (fichiers.final) return <span className="node-ok">Miniature déposée, à regarder</span>;
       return <span className="node-note">{step.state === "current" ? "À faire : Claude retouche dans le chat." : HELP[step.key]}</span>;
+    case "controle": {
+      const last = order.essais.at(-1);
+      if (!last) return <span className="node-note">{order.fichiers.final ? step.note ?? "Part tout seul." : "Part tout seul quand la miniature est déposée."}</span>;
+      return (
+        <>
+          <span className="node-big">
+            {last.score} % <small>{last.valide ? "validée" : `essai ${order.essais.length}/${CONTROLE.maxEssais}`}</small>
+          </span>
+          {!last.valide && <span className="node-err">{step.note}</span>}
+        </>
+      );
+    }
     default:
       if (step.state === "done") return <span className="node-ok">Fait le {day(step.date)}</span>;
       if (step.state === "current")
