@@ -1,10 +1,9 @@
-import { PLAQUES, texteAffiche, type Plaque } from "@/lib/plaques";
+import { couleursPlaque, PLAQUES, texteAffiche, type Plaque } from "@/lib/plaques";
 
 /*
  * Aperçu d'une plaque, dessiné en SVG aux vraies proportions (520 × 110 mm en Europe, 305 × 152 mm aux USA).
- * Les couleurs sont les mêmes que celles de la plaque 3D faite dans Blender (tools/plaque.py).
+ * Les couleurs (celles du style ou celles choisies par le client) sont les mêmes que sur la plaque 3D (tools/plaque.py).
  */
-const BLEU = "#0b2a8c";
 const JAUNE_UE = "#ffcc00";
 const CHAR = '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif';
 
@@ -21,10 +20,10 @@ function Fit({ t, x, y, w, size, fill, family = CHAR, weight = 700, style, serre
   );
 }
 
-function EuroBand({ x, letter }: { x: number; letter: string }) {
+function EuroBand({ x, letter, bleu }: { x: number; letter: string; bleu: string }) {
   return (
     <g>
-      <rect x={x} y={6} width={42} height={98} rx={3} fill={BLEU} />
+      <rect x={x} y={6} width={42} height={98} rx={3} fill={bleu} />
       {Array.from({ length: 12 }, (_, i) => {
         const a = (i * Math.PI) / 6;
         return <circle key={i} cx={x + 21 + 12 * Math.cos(a)} cy={34 + 12 * Math.sin(a)} r={2.4} fill={JAUNE_UE} />;
@@ -37,6 +36,7 @@ function EuroBand({ x, letter }: { x: number; letter: string }) {
 export default function PlatePreview({ plaque, className }: { plaque: Plaque; className?: string }) {
   const def = PLAQUES[plaque.style];
   const t = texteAffiche(plaque);
+  const c = couleursPlaque(plaque);
   const label = `Aperçu de la plaque : ${def.label}${t ? `, ${t}` : ""}`;
 
   if (plaque.style === "aucune") {
@@ -52,12 +52,12 @@ export default function PlatePreview({ plaque, className }: { plaque: Plaque; cl
 
   if (def.format === "us") {
     const floride = plaque.style === "floride";
-    const ink = floride ? "#0d6b3a" : "#1d2f6f";
+    const ink = c.texte;
     // En Floride, une orange sépare les deux moitiés du numéro.
     const [a, b] = t.includes(" ") ? [t.slice(0, t.indexOf(" ")), t.slice(t.indexOf(" ") + 1)] : [t.slice(0, Math.ceil(t.length / 2)), t.slice(Math.ceil(t.length / 2))];
     return (
       <svg className={className} viewBox="0 0 305 152" role="img" aria-label={label}>
-        <rect x={1} y={1} width={303} height={150} rx={12} fill="#fbfbf7" stroke="#9a9a9a" strokeWidth={2} />
+        <rect x={1} y={1} width={303} height={150} rx={12} fill={c.fond} stroke="#9a9a9a" strokeWidth={2} />
         {floride ? (
           <>
             <Fit t="MYFLORIDA.COM" x={152} y={22} w={150} size={17} serre={0.62} fill={ink} />
@@ -78,20 +78,20 @@ export default function PlatePreview({ plaque, className }: { plaque: Plaque; cl
     );
   }
 
-  const fond = { fr: "#fbfbf9", "fr-noire": "#111111", de: "#fbfbf9", uk: "#f6c800" }[plaque.style as "fr" | "fr-noire" | "de" | "uk"];
-  const encre = plaque.style === "fr-noire" ? "#d9d9d6" : "#111111";
+  const { fond, texte: encre } = c;
+  const bleu = c.bande ?? "#0b2a8c";
   const gauche = plaque.style === "fr" || plaque.style === "de";
   const droite = plaque.style === "fr";
   const x0 = gauche ? 52 : 14;
   const x1 = droite ? 468 : 506;
   return (
     <svg className={className} viewBox="0 0 520 110" role="img" aria-label={label}>
-      <rect x={1} y={1} width={518} height={108} rx={8} fill={fond} stroke={plaque.style === "fr-noire" ? "#bdbdbd" : "#8a8a8a"} strokeWidth={2} />
+      <rect x={1} y={1} width={518} height={108} rx={8} fill={fond} stroke="#8a8a8a" strokeWidth={2} />
       <rect x={4} y={4} width={512} height={102} rx={6} fill="none" stroke={encre} strokeWidth={1.5} />
-      {gauche && <EuroBand x={6} letter={plaque.style === "de" ? "D" : "F"} />}
+      {gauche && <EuroBand x={6} bleu={bleu} letter={plaque.style === "de" ? "D" : "F"} />}
       {droite && (
         <g>
-          <rect x={472} y={6} width={42} height={98} rx={3} fill={BLEU} />
+          <rect x={472} y={6} width={42} height={98} rx={3} fill={bleu} />
           {/* Logo de région simplifié (un vrai logo ferait 2 mm sur la miniature). */}
           <rect x={480} y={20} width={26} height={26} fill="#b3141b" />
           <rect x={485} y={31.5} width={16} height={3} fill={JAUNE_UE} />

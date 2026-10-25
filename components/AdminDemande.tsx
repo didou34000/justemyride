@@ -13,7 +13,7 @@ import { renderHighlights, renderViews } from "./renderViews";
 import { CONTROLE, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 import PlatePreview from "./PlatePreview";
-import { plaqueResume } from "@/lib/plaques";
+import { plaqueArgs, plaqueResume } from "@/lib/plaques";
 
 const TRAITEMENT: Record<string, string> = {
   couleur: "Peinture",
@@ -213,7 +213,11 @@ export default function AdminDemande({ order }: { order: Order }) {
               <PlatePreview plaque={demande.plaque} className="plate-svg small" />
               <span>
                 Plaque : {plaqueResume(demande.plaque)}
-                {demande.plaque.style !== "aucune" && " (à poser dans Blender avec tools/plaque.py)"}
+                {demande.plaque.style !== "aucune" && (
+                  <>
+                    {" "}(à poser dans Blender : <code>tools/plaque.py {plaqueArgs(demande.plaque)}</code>)
+                  </>
+                )}
               </span>
             </p>
           )}
