@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { photoSrc } from "@/lib/photo";
 import GlbViewer from "./GlbViewer";
 import { CREDITS, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, viewCredits, type ImageModel, imageCount, imagePrompt, jobDone, jobFailed, jobImages, jobKind, count3dOf, MAX_IMAGES, TYPES_3D, VUES, type PieceJob, type Pieces, type Vue, viewPrompt } from "@/lib/meshyShared";
 import type { Rapport3 } from "@/lib/rapports";
+import { SORTES, devinerSorte, suggestions, type Element } from "@/lib/bibliothequeShared";
 
 /**
  * Bloc « Pièces Meshy » de l'admin : toutes les pièces à refaire, de haut en bas.
@@ -13,13 +14,21 @@ import type { Rapport3 } from "@/lib/rapports";
  * 1. « Faire les images » : Meshy dessine la pièce seule en 2 images, de face puis de côté, chacune avec son prompt ;
  * 2. « Faire la pièce 3D » : d'après les 2 images retenues.
  * Chaque essai reste visible ; on retient le meilleur dessin et la meilleure 3D.
+ * Avant de payer : la bibliothèque propose les pièces déjà faites de la même sorte (« Prendre celle-là », gratuit).
  */
 /** Libellés des anciennes vues (3/4, arrière). */
 const OLD_LABELS: Record<string, string> = { "34": "3/4", arriere: "Arrière" };
 const jobFailedVue = (v: Vue) => ["FAILED", "CANCELED", "error"].includes(v.status);
 
-export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3: Rapport3; crops?: (string | null)[]; pieces: Pieces }) {
+export default function MeshyPieces({ id, r3, crops, pieces, voiture }: { id: string; r3: Rapport3; crops?: (string | null)[]; pieces: Pieces; voiture: string }) {
   const router = useRouter();
+  const [biblio, setBiblio] = useState<Element[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/bibliotheque")
+      .then((r) => (r.ok ? r.json() : { elements: [] }))
+      .then((d) => setBiblio(d.elements ?? []))
+      .catch(() => {});
+  }, []);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [prompts, setPrompts] = useState<Record<string, string>>({});
@@ -28,7 +37,7 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
   const nImg = pieces.jobs.reduce((t, j) => t + imageCount(j), 0);
   // Crédits réellement facturés quand Meshy les donne, sinon le tarif (un échec est remboursé).
   const cost = (j: PieceJob) =>
-    j.credits || (jobFailed(j) ? 0 : jobKind(j) === "image" ? viewCredits(j) * (j.vues?.filter((v) => !jobFailedVue(v)).length ?? 1) : CREDITS["3d"]);
+    j.bibliotheque ? 0 : j.credits || (jobFailed(j) ? 0 : jobKind(j) === "image" ? viewCredits(j) * (j.vues?.filter((v) => !jobFailedVue(v)).length ?? 1) : CREDITS["3d"]);
   const total = pieces.jobs.reduce((t, j) => t + cost(j), 0);
 
   async function act(key: string, body: object, confirm?: string) {
@@ -148,6 +157,44 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                 </button>
               </div>
 
+              {(() => {
+                const sugg = suggestions(biblio, m.piece, voiture, type).filter((e) => !jobs.some(({ j }) => j.bibliotheque === e.id));
+                return (
+                  <div className="piece-biblio">
+                    <p className="sub">
+                      <b>Dans la bibliothèque</b> ({SORTES[devinerSorte(m.piece, type)].toLowerCase()}) : si une pièce déjà faite est la bonne, prends-la, ça ne coûte rien
+                      et ne compte pas dans le plafond. <a className="link" href="/admin/bibliotheque" target="_blank" rel="noreferrer">Tout voir</a>
+                    </p>
+                    {sugg.length ? (
+                      <div className="piece-biblio-list">
+                        {sugg.map((e) => (
+                          <div key={e.id} className="piece-biblio-item">
+                            {e.apercu ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={photoSrc(e.apercu)} alt={e.nom} loading="lazy" />
+                            ) : (
+                              <GlbViewer src={photoSrc(e.glb)} colors={e.origine !== "meshy" || Boolean(e.fournie)} />
+                            )}
+                            <span>{e.nom}</span>
+                            {e.attention && <span className="biblio-attention">{e.attention}</span>}
+                            <button
+                              type="button"
+                              className="cta ghost"
+                              disabled={Boolean(busy)}
+                              onClick={() => act(`bib${i}${e.id}`, { piece: i, action: "bibliotheque", element: e.id })}
+                            >
+                              {busy === `bib${i}${e.id}` ? "…" : "Prendre celle-là · 0 cr."}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="sub">Rien de cette sorte pour l&apos;instant.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {images.length > 0 && (
                 <>
                   <p className="sub">Images : retiens la paire qui part en 3D.</p>
@@ -200,7 +247,8 @@ export default function MeshyPieces({ id, r3, crops, pieces }: { id: string; r3:
                       <div key={n} className={`piece-result${n === picked3d ? " is-picked" : ""}`}>
                         {j.glb ? (
                           <>
-                            <GlbViewer src={photoSrc(j.glb)} />
+                            <GlbViewer src={photoSrc(j.glb)} colors={Boolean(j.bibliotheque)} />
+                            {j.bibliotheque && <span className="sub">De la bibliothèque : {j.bibliothequeNom}</span>}
                             <div className="piece-result-foot">
                               <button
                                 type="button"

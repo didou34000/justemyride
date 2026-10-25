@@ -564,7 +564,7 @@ export default function AdminDemande({ order }: { order: Order }) {
           <>
             {!r3 && <p className="notice">Il faut d&apos;abord le 3e rapport.</p>}
             {r3 && !r3.meshy.length && <p className="notice">Rien d&apos;essentiel à faire générer.</p>}
-            {r3 && r3.meshy.length > 0 && <MeshyPieces id={id} r3={r3} crops={rapport3?.crops} pieces={pieces} />}
+            {r3 && r3.meshy.length > 0 && <MeshyPieces id={id} r3={r3} crops={rapport3?.crops} pieces={pieces} voiture={demande.car || demande.base?.label || ""} />}
           </>
         )}
 

@@ -13,11 +13,11 @@ import { presignUpload } from "@/lib/store";
 
 /**
  * Envoi direct navigateur → stockage (Vercel Blob ou R2) pour le propriétaire (image des logos, miniature assemblée).
- * Même principe que /api/upload, mais réservé à l'admin et limité aux fichiers de lib/fichiers.
+ * Même principe que /api/upload, mais réservé à l'admin et limité aux fichiers de lib/fichiers et aux dépôts de la bibliothèque.
  */
 const TYPES = ["image/*", "model/gltf-binary", "application/octet-stream"];
 const MAX = 200 * 1024 * 1024;
-const PATH = new RegExp(`^submissions/[\\w-]{6,40}/(${FICHIERS.join("|")})\\.(png|jpe?g|webp|glb)$`);
+const PATH = new RegExp(`^(submissions/[\\w-]{6,40}/(${FICHIERS.join("|")})\\.(png|jpe?g|webp|glb)|bibliotheque/depot/[\\w.-]{1,80}\\.glb)$`);
 
 export async function POST(request: Request) {
   if (!isAdmin(request)) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
