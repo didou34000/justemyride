@@ -985,3 +985,20 @@ ol.pieces { list-style: none; padding: 0; }
 /* Connexion client (étape « Ton compte ») */
 .or { text-align: center; font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 .turnstile { margin: 0 0 14px; min-height: 65px; }
+
+/* Étape « Ta plaque » : aperçu SVG aux vraies proportions, styles en pastilles, texte libre. */
+.plate-pick { display: grid; gap: 16px; margin: 18px 0 8px; }
+.plate-svg { display: block; width: 100%; max-width: 520px; height: auto; margin: 0 auto; filter: drop-shadow(0 6px 14px rgba(var(--ink-rgb), 0.18)); }
+.plate-svg.us { max-width: 300px; }
+.plate-svg.small { width: 170px; max-width: none; margin: 0; filter: none; }
+.plate-fields { grid-template-columns: 1fr auto; margin: 0; }
+.plate-fields input { font-family: var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.plate-fields small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.plate-dep input { width: 96px; }
+.plate-note { font-size: 13px; }
+.plate-mini { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; }
+.admin-plaque { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.admin-plaque .plate-svg.small { width: 140px; }
+@media (max-width: 480px) {
+  .plate-fields { grid-template-columns: 1fr; }
+}

@@ -4,6 +4,7 @@ import { putFile } from "@/lib/store";
 import { notifyNewRequest } from "@/lib/notify";
 import { fetchBase } from "@/lib/base";
 import type { Base } from "@/lib/catalog";
+import { parsePlaque, type Plaque } from "@/lib/plaques";
 import { authConfigured, clientKey, clientStatus, readClient, saveClient, userFromRequest } from "@/lib/clients";
 
 type Submission = {
@@ -13,6 +14,8 @@ type Submission = {
   base?: Base | null;
   /** Taille souhaitée sur la fiche produit (1-43, 1-24, 1-18), indicative. */
   size?: string;
+  /** La plaque choisie à l'étape « Ta plaque » (style + texte). */
+  plaque?: Plaque;
   mode: "photos";
   files: { slot: string; url: string; pathname: string }[];
 };
@@ -38,6 +41,9 @@ export async function POST(request: Request) {
   if (!/^\S+@\S+\.\S+$/.test(s.email)) return NextResponse.json({ error: "Email invalide" }, { status: 400 });
   if (!s.files?.length) return NextResponse.json({ error: "Aucun fichier" }, { status: 400 });
   if (s.size !== undefined && !/^1-(43|24|18)$/.test(s.size)) delete s.size;
+  const plaque = parsePlaque(s.plaque);
+  if (plaque) s.plaque = plaque;
+  else delete s.plaque;
 
   if (user) {
     const key = clientKey(user.email);

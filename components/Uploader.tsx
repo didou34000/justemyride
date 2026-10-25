@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import CarPicker from "./CarPicker";
 import ClientLogin, { type ClientStatus } from "./ClientLogin";
+import PlatePicker from "./PlatePicker";
+import PlatePreview from "./PlatePreview";
+import { cleanTexte, type Plaque } from "@/lib/plaques";
 import type { Base } from "@/lib/catalog";
 import { track } from "@vercel/analytics";
 import type { StorageMode } from "@/lib/storage";
@@ -11,7 +14,7 @@ import { authConfigured } from "@/lib/authShared";
 import { authHeaders } from "@/lib/supabaseClient";
 
 /*
- * Envoi d'une voiture en 3 étapes : la voiture, les photos (6 vues guidées, puis autant qu'on veut), le contact.
+ * Envoi d'une voiture en 4 étapes : la voiture, les photos (6 vues guidées, puis autant qu'on veut), la plaque, le contact.
  * Quand la connexion client est branchée, une étape « Ton compte » passe avant (1 aperçu gratuit par personne).
  * Les noms des fichiers (« avant », « avant-gauche », « gauche », « droite », « arriere-droite », « arriere », « photo-N »)
  * sont lus par l'admin et par les rapports de Claude.
@@ -29,7 +32,7 @@ const MAX_EXTRA = 78;
 const PARALLEL = 4;
 
 type ReqId = (typeof REQUIRED)[number]["id"];
-type Step = "compte" | "car" | "photos" | "contact";
+type Step = "compte" | "car" | "photos" | "plaque" | "contact";
 type Phase = "idle" | "sending" | "done" | "error";
 
 /**
@@ -66,6 +69,7 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
   const [car, setCar] = useState("");
   const [req, setReq] = useState<Partial<Record<ReqId, File>>>({});
   const [extra, setExtra] = useState<File[]>([]);
+  const [plaque, setPlaque] = useState<Plaque>({ style: "fr" });
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -163,10 +167,10 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ id, email, car, base, size, ...(config ? { config } : {}), mode: "photos", files: uploaded }),
+        body: JSON.stringify({ id, email, car, base, size, plaque: { ...plaque, texte: cleanTexte(plaque.texte ?? "", plaque.style).trim() || undefined }, ...(config ? { config } : {}), mode: "photos", files: uploaded }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Envoi refusé");
-      track("Photos envoyées", { photos: files.length });
+      track("Photos envoyées", { photos: files.length, plaque: plaque.style });
       setProgress(100);
       setPhase("done");
     } catch (e) {
@@ -200,6 +204,7 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
     ...(auth ? [{ id: "compte" as Step, label: "Ton compte" }] : []),
     { id: "car", label: "Ta voiture" },
     { id: "photos", label: "Tes photos" },
+    { id: "plaque", label: "Ta plaque" },
     { id: "contact", label: auth ? "Envoi" : "Ton e-mail" },
   ];
   const cur = steps.findIndex((s) => s.id === step);
@@ -323,8 +328,22 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
             </div>
           </div>
 
-          <button className="cta full" disabled={!reqDone} onClick={() => setStep("contact")}>
+          <button className="cta full" disabled={!reqDone} onClick={() => setStep("plaque")}>
             {reqDone ? `Continuer avec ${total} photo${total > 1 ? "s" : ""}` : "Ajoute au moins le 3/4 avant et le 3/4 arrière"}
+          </button>
+        </div>
+      )}
+
+      {step === "plaque" && (
+        <div className="plaque">
+          <h2 className="wz-title">Ta plaque d'immatriculation</h2>
+          <p className="wz-tip">Choisis le style et écris ce que tu veux dessus : l'aperçu suit en direct.</p>
+          <PlatePicker value={plaque} onChange={setPlaque} />
+          <button className="cta full" onClick={() => setStep("contact")}>
+            Continuer
+          </button>
+          <button className="link back" onClick={() => setStep("photos")}>
+            ← Revenir aux photos ({total})
           </button>
         </div>
       )}
@@ -333,6 +352,10 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
         <div className="contact">
           <h2 className="wz-title">{account ? "Dernière étape" : "Où t'envoyer ton aperçu 3D ?"}</h2>
           <p className="wz-tip">On t'écrit dès qu'il est prêt.</p>
+          <button className="plate-mini" onClick={() => setStep("plaque")} aria-label="Changer la plaque">
+            <PlatePreview plaque={plaque} className="plate-svg small" />
+            <span className="link">Changer</span>
+          </button>
           <div className="up-fields">
             <label>
               Ta voiture
@@ -362,8 +385,8 @@ export default function Uploader({ size, config }: { size?: string; config?: Rec
             </div>
           )}
           {phase === "error" && <p className="notice err">{error}</p>}
-          <button className="link back" onClick={() => setStep("photos")}>
-            ← Revenir aux photos ({total})
+          <button className="link back" onClick={() => setStep("plaque")}>
+            ← Revenir à la plaque
           </button>
         </div>
       )}
