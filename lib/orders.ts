@@ -7,6 +7,7 @@ import { readPieces, type Pieces } from "@/lib/meshy";
 import { jobFailed, piecesRunning, retained3d } from "@/lib/meshyShared";
 import { readFichiers, type Fichiers } from "@/lib/fichiers";
 import type { Base } from "@/lib/catalog";
+import type { Plaque } from "@/lib/plaques";
 import { CONTROLE, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
 
 export { MANUAL, STEPS, type ManualStep, type Step, type Suivi } from "@/lib/steps";
@@ -25,6 +26,8 @@ export type Demande = {
   car: string;
   base?: Base | null;
   size?: string;
+  /** La plaque voulue par le client (lib/plaques.ts), à faire avec tools/plaque.py. */
+  plaque?: Plaque;
   receivedAt?: string;
   /** Aperçu payé 5 € par le client (pas son premier) : à déduire du prix de la miniature. */
   apercuPaye?: boolean;

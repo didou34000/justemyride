@@ -3,6 +3,8 @@
  * Sans RESEND_API_KEY ou NOTIFY_EMAIL, rien n'est envoyé : la demande reste enregistrée dans le stockage.
  */
 
+import { plaqueResume, type Plaque } from "@/lib/plaques";
+
 // Domaine déjà vérifié sur le compte Resend ; à remplacer par justmyride.shop une fois le domaine acheté et vérifié.
 const FROM = process.env.RESEND_FROM || "JustMyRide <alertes@iksee.fr>";
 const FALLBACK_FROM = "JustMyRide <onboarding@resend.dev>";
@@ -12,6 +14,7 @@ export type NewRequest = {
   email: string;
   car: string;
   base?: { label: string; uid?: string; car?: string; source: string } | null;
+  plaque?: Plaque;
   files: { slot: string; pathname: string }[];
 };
 
@@ -44,6 +47,7 @@ export async function notifyNewRequest(r: NewRequest): Promise<"sent" | "off"> {
       <p style="margin:0 0 16px">
         Client : <a href="mailto:${esc(r.email)}">${esc(r.email)}</a><br>
         Base 3D : ${base}<br>
+        ${r.plaque ? `Plaque : ${esc(plaqueResume(r.plaque))}<br>` : ""}
         Photos : ${angles} vue${angles > 1 ? "s" : ""}${details ? ` + ${details} détail${details > 1 ? "s" : ""}` : ""}<br>
         Dossier : <code>submissions/${esc(r.id)}/</code>
       </p>

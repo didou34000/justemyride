@@ -12,6 +12,8 @@ import { retained3d } from "@/lib/meshyShared";
 import { renderHighlights, renderViews } from "./renderViews";
 import { CONTROLE, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
+import PlatePreview from "./PlatePreview";
+import { plaqueResume } from "@/lib/plaques";
 
 const TRAITEMENT: Record<string, string> = {
   couleur: "Peinture",
@@ -206,6 +208,15 @@ export default function AdminDemande({ order }: { order: Order }) {
             {demande.size && ` · taille ${demande.size.replace("-", ":")}`}
             {demande.apercuPaye && " · aperçu payé 5 €, à déduire de la miniature"}
           </p>
+          {demande.plaque && (
+            <p className="sub admin-plaque">
+              <PlatePreview plaque={demande.plaque} className="plate-svg small" />
+              <span>
+                Plaque : {plaqueResume(demande.plaque)}
+                {demande.plaque.style !== "aucune" && " (à poser dans Blender avec tools/plaque.py)"}
+              </span>
+            </p>
+          )}
         </div>
         <span className="admin-top-r">
           <LiveRefresh every={running ? 8 : 30} poll={meshyBusy ? `/api/meshy?id=${id}` : undefined} />
