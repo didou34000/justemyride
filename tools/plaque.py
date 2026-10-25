@@ -2,7 +2,10 @@
 Mêmes styles et mêmes couleurs que l'aperçu du site (lib/plaques.ts, components/PlatePreview.tsx).
 
   python tools/plaque.py -- entree.glb sortie.glb --style fr --texte "AM-864-BH" --dep 34 \
-      --avant 0,-2.032,0.47 --arriere 0,1.494,0.822
+      --avant 0,-2.032,0.47 --arriere 0,1.494,0.822 [--fond "#rrggbb" --encre "#rrggbb" --bande "#rrggbb"]
+
+--fond / --encre / --bande : les couleurs choisies par le client (fond, lettres, bandes bleues) ; sans elles, celles du style.
+La ligne exacte à lancer est écrite sur la page admin de la demande.
 
 --avant / --arriere : le dos de la plaque (x, y, z en mètres, repère Blender, avant de la voiture vers -Y).
 Sur la Mini e7de60f3 : avant sur le pare-chocs sous la barre chromée, arrière dans le renfoncement du hayon.
@@ -17,6 +20,7 @@ a.add_argument("entree"); a.add_argument("sortie")
 a.add_argument("--style", default="fr", choices=["fr", "fr-noire", "de", "uk", "floride", "californie", "aucune"])
 a.add_argument("--texte", default="AB-123-CD"); a.add_argument("--dep", default="")
 a.add_argument("--avant", default=""); a.add_argument("--arriere", default="")
+a.add_argument("--fond", default=""); a.add_argument("--encre", default=""); a.add_argument("--bande", default="")
 a.add_argument("--police", default="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 args = a.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
@@ -79,8 +83,11 @@ def texte(t, x, z, y, haut, larg_max, ep, m, serre=0.78, italique=False):
     o.data.materials.clear(); o.data.materials.append(m); pieces.append(o)
 
 
+BLEU = args.bande or "#0b2a8c"
+
+
 def bande_ue(xc, lettre, y):
-    boite(42, 98, 0.4, xc, 0, y, mat("#0b2a8c"))
+    boite(42, 98, 0.4, xc, 0, y, mat(BLEU))
     for i in range(12):
         ang = i * math.pi / 6
         disque(2.4, xc + 12 * math.cos(ang), 21 + 12 * math.sin(ang), y - 0.4, 0.4, mat("#ffcc00"))
@@ -91,23 +98,23 @@ S, T = args.style, args.texte.upper()
 E = 3.0  # épaisseur de la plaque (mm)
 if S in ("floride", "californie"):  # format américain 305 × 152 mm
     L, H = 305, 152
-    boite(L, H, E, 0, 0, 0, mat("#fbfbf7"), bevel=10)
+    boite(L, H, E, 0, 0, 0, mat(args.fond or "#fbfbf7"), bevel=10)
     if S == "floride":
-        ink = mat("#0d6b3a")
+        ink = mat(args.encre or "#0d6b3a")
         a_, b_ = (T.split(" ", 1) if " " in T else (T[: (len(T) + 1) // 2], T[(len(T) + 1) // 2:]))
         texte("MYFLORIDA.COM", 0, 54, -E, 12, 150, 0.6, ink)
         texte(a_, -84, 0, -E, 62, 100, 0.8, ink); texte(b_, 84, 0, -E, 62, 100, 0.8, ink)
         disque(20, 0, 0, -E, 1.0, mat("#f28c1b"))
         texte("SUNSHINE STATE", 0, -57, -E, 12, 170, 0.6, ink)
     else:
-        ink = mat("#1d2f6f")
+        ink = mat(args.encre or "#1d2f6f")
         texte("California", 0, 48, -E, 24, 160, 0.6, mat("#c8102e"), serre=1.0, italique=True)
         texte(T, 0, -12, -E, 66, 270, 0.8, ink)
         texte("DMV.CA.GOV", 0, -60, -E, 10, 110, 0.6, ink)
 else:  # format européen 520 × 110 mm
     L, H = 520, 110
-    fond = {"fr": "#fbfbf9", "fr-noire": "#111111", "de": "#fbfbf9", "uk": "#f6c800"}[S]
-    encre = mat("#d9d9d6", metal=0.6, rough=0.3) if S == "fr-noire" else mat("#111111")
+    fond = args.fond or {"fr": "#fbfbf9", "fr-noire": "#111111", "de": "#fbfbf9", "uk": "#f6c800"}[S]
+    encre = mat(args.encre or "#d9d9d6", metal=0.6, rough=0.3) if S == "fr-noire" else mat(args.encre or "#111111")
     boite(L, H, E, 0, 0, 0, mat(fond, rough=0.3), bevel=6)
     f = 1.5  # liseré
     for sx, sz, x, z in ((L - 12, f, 0, H / 2 - 5), (L - 12, f, 0, -H / 2 + 5), (f, H - 12, -L / 2 + 5, 0), (f, H - 12, L / 2 - 5, 0)):
@@ -117,7 +124,7 @@ else:  # format européen 520 × 110 mm
         bande_ue(-L / 2 + 27, "D" if S == "de" else "F", -E); x0 = -L / 2 + 52
     if S == "fr":
         xb = L / 2 - 27
-        boite(42, 98, 0.4, xb, 0, -E, mat("#0b2a8c"))
+        boite(42, 98, 0.4, xb, 0, -E, mat(BLEU))
         # logo de région simplifié (2 mm sur une 1:43)
         boite(26, 26, 0.4, xb, 21, -E - 0.4, mat("#b3141b"))
         boite(16, 3, 0.3, xb, 21, -E - 0.8, mat("#ffcc00")); boite(3, 16, 0.3, xb, 21, -E - 0.8, mat("#ffcc00"))
