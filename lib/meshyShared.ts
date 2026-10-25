@@ -7,8 +7,12 @@ export const TYPES_3D = {
 } as const;
 export type Type3D = keyof typeof TYPES_3D;
 export const isType3D = (t: unknown): t is Type3D => typeof t === "string" && t in TYPES_3D;
-/** Générations 3D déjà faites (échecs compris) pour une sorte d'élément ; les anciens jobs sans sorte sont des pièces. */
-export const count3dOf = (p: { jobs: PieceJob[] }, t: Type3D) => p.jobs.filter((j) => jobKind(j) === "3d" && (j.type ?? "piece") === t).length;
+/**
+ * Générations 3D déjà faites (échecs compris) pour une sorte d'élément ; les anciens jobs sans sorte sont des pièces.
+ * Une pièce prise dans la bibliothèque ne compte pas : elle n'a rien coûté.
+ */
+export const count3dOf = (p: { jobs: PieceJob[] }, t: Type3D) =>
+  p.jobs.filter((j) => jobKind(j) === "3d" && !j.bibliotheque && (j.type ?? "piece") === t).length;
 /** Dessins comptés image par image (2 images par clic). */
 export const MAX_IMAGES = 12;
 /**
@@ -117,6 +121,10 @@ export type PieceJob = {
   error?: string;
   /** Crédits Meshy réellement facturés (0 si échec : remboursé). */
   credits?: number;
+  /** Pièce reprise de la bibliothèque (son id) : rien n'est parti chez Meshy. */
+  bibliotheque?: string;
+  /** Nom de la pièce de la bibliothèque reprise. */
+  bibliothequeNom?: string;
   startedAt: string;
 };
 export type Pieces = {

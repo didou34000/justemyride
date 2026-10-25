@@ -1019,3 +1019,27 @@ ol.pieces { list-style: none; padding: 0; }
 @media (max-width: 480px) {
   .plate-fields { grid-template-columns: 1fr; }
 }
+
+/* Bibliothèque de pièces 3D (admin) */
+.biblio-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin: 20px 0 16px; }
+.biblio-search { flex: 0 1 300px; min-width: 0; width: 100%; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 10px; font: inherit; font-size: 14px; background: #fff; }
+.biblio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.biblio-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; }
+.biblio-visu .glb-viewer { aspect-ratio: 1; border: 0; border-radius: 0; }
+.biblio-thumb { display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; background: #3a3a3c; cursor: zoom-in; }
+.biblio-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.biblio-thumb.empty { display: grid; place-items: center; color: #fff; font: inherit; font-size: 14px; }
+.biblio-body { padding: 12px 14px 14px; display: grid; gap: 6px; }
+.biblio-body h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
+.biblio-meta { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.biblio-meta .chip { padding: 3px 10px; font-size: 12px; }
+.biblio-attention { margin: 0; font-size: 12.5px; color: #9b3b32; background: #fdf3f2; border: 1px solid #efc9c5; border-radius: 8px; padding: 6px 9px; }
+.biblio-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+.biblio-actions .link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 13px; }
+.biblio-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.biblio-form input, .biblio-form select { flex: 1 1 180px; min-width: 0; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 10px; font: inherit; font-size: 14px; background: #fff; }
+.biblio-card .biblio-form input, .biblio-card .biblio-form select { flex-basis: 100%; }
+.piece-biblio { margin-top: 14px; padding: 12px; border: 1px dashed var(--line-strong); border-radius: 12px; }
+.piece-biblio-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+.piece-biblio-item { display: grid; gap: 6px; font-size: 13px; }
+.piece-biblio-item img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: #3a3a3c; }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import AdminLogin from "@/components/AdminLogin";
 import AdminLogout from "@/components/AdminLogout";
@@ -34,6 +35,7 @@ export default async function AdminPage() {
             <h2>Les commandes</h2>
           </div>
           <span className="admin-top-r">
+            <Link href="/admin/bibliotheque" className="cta ghost">Bibliothèque de pièces 3D</Link>
             <LiveRefresh every={30} />
             <AdminLogout />
           </span>

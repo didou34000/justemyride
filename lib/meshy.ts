@@ -3,6 +3,8 @@ import { num, readBytes, readJson, usageCounter, writeJson } from "@/lib/blobJso
 import { storageEnabled } from "@/lib/storage";
 import type { Rapport3Rec } from "@/lib/rapports";
 import { readGlb, slimGlb, writeGlb } from "@/lib/glb";
+import { addFromJob, getElement } from "@/lib/bibliotheque";
+import type { Demande } from "@/lib/orders";
 import { count3dOf, DEFAULT_IMAGE_MODEL, isImageModel, imageCount, imagePrompt, jobDone, jobImages, jobKind, MAX_IMAGES, TYPES_3D, viewPrompt, vueDone, VUES, type PieceJob, type Pieces } from "@/lib/meshyShared";
 
 export type { PieceJob, Pieces };
@@ -172,6 +174,7 @@ const failed = (s: string) => ["FAILED", "CANCELED", "error"].includes(s);
 export async function refreshPieces(id: string) {
   const state = await readPieces(id);
   let changed = false;
+  const livrees: number[] = [];
   for (const [n, job] of state.jobs.entries()) {
     if (jobDone(job)) continue;
     const kind = jobKind(job);
@@ -195,7 +198,10 @@ export async function refreshPieces(id: string) {
         if (t.status === "SUCCEEDED" && t.image_urls?.[0]) job.image = await copy(`${file}-vue.png`, t.image_urls[0], "image/png");
       } else {
         if (!job.thumb && t.thumbnail_url) job.thumb = await copy(`${file}.png`, t.thumbnail_url, "image/png").catch(() => undefined);
-        if (t.status === "SUCCEEDED" && t.model_urls?.glb) job.glb = await copy(`${file}.glb`, t.model_urls.glb, "model/gltf-binary");
+        if (t.status === "SUCCEEDED" && t.model_urls?.glb) {
+          job.glb = await copy(`${file}.glb`, t.model_urls.glb, "model/gltf-binary");
+          livrees.push(n);
+        }
       }
     } catch (e) {
       // On garde la trace : sinon l'admin voit « 0 % » sans savoir pourquoi.
@@ -204,6 +210,50 @@ export async function refreshPieces(id: string) {
     changed = true;
   }
   if (changed) await writeJson(path(id), state);
+  // Chaque pièce 3D livrée part aussi dans la bibliothèque, pour resservir dans une autre commande.
+  if (livrees.length) {
+    const voiture = await carOf(id);
+    for (const n of livrees) await addFromJob(id, n, state.jobs[n], voiture).catch((e) => console.error("Bibliothèque :", e));
+  }
+  return state;
+}
+
+const carOf = async (id: string) => {
+  const d = await readJson<Demande>(`submissions/${id}/demande.json`).catch(() => null);
+  return d?.car || d?.base?.label || "";
+};
+
+/**
+ * Reprend une pièce de la bibliothèque pour une pièce de la commande : gratuit, hors plafond Meshy.
+ * Elle devient la 3D retenue de cette pièce (on peut toujours en retenir une autre).
+ */
+export async function takeFromLibrary(id: string, index: number, elementId: string) {
+  const el = await getElement(elementId);
+  if (!el) throw new Error("Pièce introuvable dans la bibliothèque");
+  const r3 = await readJson<Rapport3Rec>(`submissions/${id}/rapport3.json`);
+  const item = r3?.result?.meshy[index];
+  if (!item) throw new Error("Pièce inconnue");
+  const state = await readPieces(id);
+  const deja = state.jobs.findIndex((j) => j.index === index && j.bibliotheque === el.id);
+  const n = deja >= 0 ? deja : state.jobs.length;
+  if (deja < 0)
+    state.jobs.push({
+      index,
+      piece: item.piece,
+      type: item.type ?? "piece",
+      kind: "3d",
+      crop: r3?.crops?.[index] ?? "",
+      status: "SUCCEEDED",
+      progress: 100,
+      glb: el.glb,
+      thumb: el.apercu,
+      credits: 0,
+      bibliotheque: el.id,
+      bibliothequeNom: el.nom,
+      startedAt: new Date().toISOString(),
+    });
+  state.choix3d = { ...state.choix3d, [index]: n };
+  await writeJson(path(id), state);
   return state;
 }
 
