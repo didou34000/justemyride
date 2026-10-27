@@ -23,7 +23,7 @@ const RULES = `Tu es l'expert automobile de JustMyRide, qui fabrique des miniatu
 Principe : on part TOUJOURS du modèle 3D de base choisi par le client sur Sketchfab. On ne réinvente pas la voiture ; on corrige ce modèle pour qu'il ressemble à la vraie.
 - Ignore ce qui ne se verra pas sur une miniature (saleté, reflets, petites rayures, intérieur).
 - Ne recopie jamais un texte de plaque d'immatriculation.
-- Logos et noms de marque : signale-les (on ne les reproduit pas tels quels, ce sont des marques déposées ; l'humain décidera).
+- Logos et noms de marque : signale-les. On ne les reproduit JAMAIS (marques déposées) : à chaque emplacement de logo de marque, on pose notre monogramme JM en 3D à la place.
 - Les vues du modèle sont numérotées « Vue 1 à 4 » : l'avant n'est pas forcément la vue 1, déduis-le de l'image.
 - Si tu n'es pas sûr, dis-le : un humain relit.
 Réponds en français, concret et précis.`;
@@ -312,6 +312,19 @@ export const Rapport3 = z.object({
       })
     )
     .describe(`Les pièces essentielles et les stickers (2 au maximum) à générer avec Meshy, ${MAX_PIECES} lignes au maximum, le plus important d'abord.`),
+  logos: z
+    .array(
+      z.object({
+        marque: z.string().describe("Le logo d'origine à remplacer (ex. hélice BMW du capot, écriture M140i du hayon)."),
+        ou: z.string().describe("L'emplacement exact sur la voiture (ex. centre du capot juste au-dessus de la calandre)."),
+        forme: z
+          .enum(["rond", "ovale", "ecusson", "lettres", "autre"])
+          .describe("La forme du logo d'origine : le monogramme JM prend la même place et à peu près la même taille.")
+          .catch("autre"),
+        taille: z.string().describe("Taille réelle estimée sur la voiture (ex. 8 cm de diamètre, 15 cm de large)."),
+      })
+    )
+    .describe("TOUS les logos et noms de marque visibles sur les photos : chacun sera remplacé par le monogramme JM en 3D, au même endroit."),
 });
 export type Rapport3 = z.infer<typeof Rapport3>;
 export type Rapport3Rec = Rec<Rapport3> & { crops?: (string | null)[] };
@@ -331,7 +344,9 @@ Ensuite, liste (${MAX_PIECES} au maximum, la plus importante d'abord) les pièce
 - une pièce par ligne ; pour des roues identiques, une seule roue suffit (on la copiera sur les 4).
 Ajoute aussi à la liste meshy les stickers visibles, 2 au maximum (les plus grands ou les plus reconnaissables d'abord), avec type « sticker » :
 le cadre serre le sticker seul, la consigne décrit son dessin, ses couleurs et où il se pose. Les autres stickers : solution « decalque ».
-Si rien d'essentiel ne manque et qu'il n'y a pas de sticker, laisse la liste meshy vide.`;
+Si rien d'essentiel ne manque et qu'il n'y a pas de sticker, laisse la liste meshy vide.
+Logos : relève dans « logos » CHAQUE logo ou nom de marque visible (calandre, capot, hayon, jantes, ailes…), avec son emplacement exact, sa forme et sa taille.
+Ne les mets ni dans la liste meshy ni en décalque : on ne reproduit jamais un vrai logo, on pose à la place notre monogramme JM en 3D (pièce déjà prête, 0 crédit).`;
 
 /** Recadre la photo sur la pièce (avec une marge) pour que Meshy ne refasse pas toute la voiture. */
 async function crop(id: string, i: number, pathname: string, c: { x: number; y: number; l: number; h: number }) {
@@ -447,6 +462,10 @@ C'est le contrôle avant d'envoyer le rendu au client. Donne un score de ressemb
 Plus de ${CONTROLE.seuil} seulement si le client reconnaît SA voiture au premier coup d'œil, qu'il ne reste rien de bloquant et qu'à peu près TOUT y est,
 petits détails compris : les stickers visibles (2 sont refaits en 3D, les autres en décalque) doivent être présents et au bon endroit. Un sticker ou un détail visible absent fait perdre des points. Ne gonfle pas le score : un humain s'en sert pour décider d'envoyer ou non.
 Si le score ne dépasse pas ${CONTROLE.seuil}, liste TOUS les écarts, du plus grave au moins grave, chacun avec une consigne de correction précise.
+Logos : la miniature ne porte JAMAIS le vrai logo de la marque. À chaque emplacement de logo, on attend notre monogramme JM en 3D, à la même place et à peu près à la même taille.
+- un monogramme JM à la place du logo compte comme juste : ne retire aucun point parce que le vrai logo n'y est pas ;
+- un emplacement de logo resté vide fait perdre des points (écart a_corriger, correction blender : poser le monogramme JM) ;
+- un vrai logo de marque visible sur la miniature est un écart bloquant (correction blender : le retirer et poser le monogramme JM).
 Si un contrôle précédent t'est donné, vérifie d'abord si ses écarts ont été corrigés, et reste cohérent dans ta notation.`;
 
 const essaisPath = (id: string) => file(id, "controle-essais");
@@ -457,6 +476,7 @@ export async function controle(id: string, views: string[], glb: string, meshyRe
   if (!demande) throw new Error("Demande introuvable");
   const essais = await readEssais(id);
   const prev = await readJson<ControleRec>(file(id, "controle"));
+  const logos = (await readJson<Rapport3Rec>(file(id, "rapport3")))?.result?.logos ?? [];
   return runClaude(
     file(id, "controle"),
     {
@@ -476,6 +496,12 @@ export async function controle(id: string, views: string[], glb: string, meshyRe
           prev?.result
             ? { type: "text", text: `Contrôle précédent (${prev.result.score} %) :\n${JSON.stringify(prev.result.ecarts)}` }
             : { type: "text", text: "Premier contrôle." },
+          {
+            type: "text",
+            text: logos.length
+              ? `Emplacements de logos relevés (monogramme JM attendu à chacun) :\n${logos.map((l) => `- ${l.marque} : ${l.ou} (${l.taille})`).join("\n")}`
+              : "Aucun emplacement de logo relevé : vérifie quand même qu'aucun vrai logo de marque n'est visible.",
+          },
           ...views.flatMap((v, i) => imageBlock(v, `Vue ${i + 1} de la miniature terminée :`)),
           ...blocks,
           { type: "text", text: "Donne le score de ressemblance et la liste des écarts." },
