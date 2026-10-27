@@ -14,6 +14,7 @@ import { CONTROLE, STEPS } from "@/lib/steps";
 import type { Order } from "@/lib/orders";
 import PlatePreview from "./PlatePreview";
 import { plaqueArgs, plaqueResume } from "@/lib/plaques";
+import { MONOGRAMME } from "@/lib/bibliothequeShared";
 
 const TRAITEMENT: Record<string, string> = {
   couleur: "Peinture",
@@ -554,6 +555,30 @@ export default function AdminDemande({ order }: { order: Order }) {
                   ))}
                 </div>
                 <p className="sub">Pièces choisies pour Meshy : {r3.meshy.length ? r3.meshy.map((m) => m.piece).join(", ") : "aucune"} (bloc Pièces Meshy).</p>
+                <h4>Logos : monogramme JM à la place ({(r3.logos ?? []).length})</h4>
+                <div className="admin-logos">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={MONOGRAMME.apercu} alt="Monogramme JM" width={72} height={72} />
+                  <div>
+                    {(r3.logos ?? []).length ? (
+                      <ul className="sub">
+                        {(r3.logos ?? []).map((l, i) => (
+                          <li key={i}>
+                            <strong>{l.marque}</strong> : {l.ou} ({l.forme}, {l.taille})
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="sub">Aucun logo de marque relevé sur les photos.</p>
+                    )}
+                    <p className="sub">
+                      Jamais le vrai logo : Claude pose le monogramme JM en 3D à chacun de ces endroits dans Blender, à la même taille.{" "}
+                      <a href={MONOGRAMME.glb} download>
+                        Télécharger le monogramme (.glb)
+                      </a>
+                    </p>
+                  </div>
+                </div>
               </>
             )}
             {v2Glb && <div className="admin-actions">{redo("rapport3", rapport3 ? "Refaire le 3e rapport" : "Lancer le 3e rapport", doRapport3)}</div>}

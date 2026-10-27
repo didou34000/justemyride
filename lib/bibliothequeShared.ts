@@ -38,6 +38,9 @@ export type Element = {
   ajouteLe: string;
 };
 
+/** Notre monogramme JM : posé à la place de chaque logo de marque (jamais de vrai logo sur une miniature vendue). */
+export const MONOGRAMME = { glb: "/bibliotheque/badge-rond-jm.glb", apercu: "/bibliotheque/badge-rond-jm.webp" };
+
 const LOGO_MARQUE = "Vrai logo de marque : jamais sur une miniature vendue (sélecteur et garage seulement).";
 
 /** Les pièces déjà faites avant la bibliothèque, livrées avec le site (public/bibliotheque). */
