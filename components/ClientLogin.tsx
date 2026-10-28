@@ -13,6 +13,13 @@ declare global {
   }
 }
 
+const DOWN = "La connexion est momentanément indisponible. Réessaie dans quelques minutes.";
+
+/** Supabase injoignable (projet en pause, panne, pas de réseau) plutôt qu'une vraie erreur du client. */
+const down = (e: { name?: string; status?: number; message: string }) =>
+  e.name === "AuthRetryableFetchError" || (e.status ?? 0) >= 500 || /failed to fetch|network|load failed/i.test(e.message);
+const friendly = (e: Error) => (down(e) ? DOWN : e.message);
+
 /** Case anti-robot Cloudflare Turnstile ; le jeton part avec la demande de code, Supabase le vérifie. */
 function Turnstile({ onToken }: { onToken: (t: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -48,16 +55,28 @@ export default function ClientLogin({ onReady }: { onReady: (s: ClientStatus) =>
   const [error, setError] = useState("");
 
   async function refresh() {
-    const res = await fetch("/api/client", { headers: await authHeaders(), cache: "no-store" });
-    if (res.status === 401) return setLogged(false);
-    const d = await res.json();
-    setLogged(true);
-    setStatus(d);
+    try {
+      const res = await fetch("/api/client", { headers: await authHeaders(), cache: "no-store" });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setLogged(true);
+        setStatus(d);
+        return;
+      }
+      // 503 = Supabase ne répond pas : on le dit, au lieu de laisser croire que le client est déconnecté.
+      if (res.status !== 401) setError(d.error ?? DOWN);
+    } catch {
+      setError(DOWN);
+    }
+    setLogged(false);
   }
 
   useEffect(() => {
     const sb = supabase();
-    sb.auth.getSession().then(({ data }) => (data.session ? refresh() : setLogged(false)));
+    sb.auth
+      .getSession()
+      .then(({ data }) => (data.session ? refresh() : setLogged(false)))
+      .catch(() => setLogged(false));
     const { data } = sb.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") refresh();
       if (event === "SIGNED_OUT") {
@@ -74,7 +93,7 @@ export default function ClientLogin({ onReady }: { onReady: (s: ClientStatus) =>
     try {
       await f();
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendly(e as Error));
     } finally {
       setBusy(false);
     }
@@ -86,6 +105,7 @@ export default function ClientLogin({ onReady }: { onReady: (s: ClientStatus) =>
         email: email.trim(),
         options: { shouldCreateUser: true, ...(captcha ? { captchaToken: captcha } : {}) },
       });
+      if (error && down(error)) throw new Error(DOWN);
       if (error) throw new Error(/rate|limit/i.test(error.message) ? "Trop de demandes : réessaie dans une minute." : error.message);
       setSent(true);
       track("Code de connexion demandé");
@@ -94,13 +114,14 @@ export default function ClientLogin({ onReady }: { onReady: (s: ClientStatus) =>
   const checkCode = () =>
     run(async () => {
       const { error } = await supabase().auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
+      if (error && down(error)) throw new Error(DOWN);
       if (error) throw new Error("Code incorrect ou expiré.");
     });
 
   const google = () =>
     run(async () => {
       const { error } = await supabase().auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(down(error) ? DOWN : error.message);
     });
 
   const pay = () =>

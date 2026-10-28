@@ -5,7 +5,7 @@ import { notifyNewRequest } from "@/lib/notify";
 import { fetchBase } from "@/lib/base";
 import type { Base } from "@/lib/catalog";
 import { parsePlaque, type Plaque } from "@/lib/plaques";
-import { authConfigured, clientKey, clientStatus, readClient, saveClient, userFromRequest } from "@/lib/clients";
+import { AuthDown, authConfigured, clientKey, clientStatus, readClient, saveClient, userFromRequest } from "@/lib/clients";
 
 type Submission = {
   id: string;
@@ -34,7 +34,8 @@ export async function POST(request: Request) {
   delete s.apercuPaye;
 
   // Connexion branchée : l'adresse est celle du compte, et un seul aperçu gratuit par compte.
-  const user = authConfigured() ? await userFromRequest(request) : null;
+  const user = authConfigured() ? await userFromRequest(request).catch((e) => (e instanceof AuthDown ? e : Promise.reject(e))) : null;
+  if (user instanceof AuthDown) return NextResponse.json({ error: user.message }, { status: 503 });
   if (authConfigured() && !user) return NextResponse.json({ error: "Connecte-toi pour envoyer ta voiture" }, { status: 401 });
   if (user) s.email = user.email;
   if (!/^[\w-]{6,40}$/.test(s.id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
