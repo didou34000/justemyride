@@ -2,9 +2,10 @@
 Mêmes styles et mêmes couleurs que l'aperçu du site (lib/plaques.ts, components/PlatePreview.tsx).
 
   python tools/plaque.py -- entree.glb sortie.glb --style fr --texte "AM-864-BH" --dep 34 \
-      --avant 0,-2.032,0.47 --arriere 0,1.494,0.822 [--fond "#rrggbb" --encre "#rrggbb" --bande "#rrggbb"]
+      --avant 0,-2.032,0.47 --arriere 0,1.494,0.822 [--fond "#rrggbb" --encre "#rrggbb" --bande "#rrggbb" --cadre "#rrggbb"]
 
 --fond / --encre / --bande : les couleurs choisies par le client (fond, lettres, bandes bleues) ; sans elles, celles du style.
+--cadre : un contour de couleur sur tout le bord de la plaque (ex. noir), en plus du liseré.
 La ligne exacte à lancer est écrite sur la page admin de la demande.
 
 --avant / --arriere : le dos de la plaque (x, y, z en mètres, repère Blender, avant de la voiture vers -Y).
@@ -20,7 +21,7 @@ a.add_argument("entree"); a.add_argument("sortie")
 a.add_argument("--style", default="fr", choices=["fr", "fr-noire", "de", "uk", "floride", "californie", "aucune"])
 a.add_argument("--texte", default="AB-123-CD"); a.add_argument("--dep", default="")
 a.add_argument("--avant", default=""); a.add_argument("--arriere", default="")
-a.add_argument("--fond", default=""); a.add_argument("--encre", default=""); a.add_argument("--bande", default="")
+a.add_argument("--fond", default=""); a.add_argument("--encre", default=""); a.add_argument("--bande", default=""); a.add_argument("--cadre", default="")
 a.add_argument("--police", default="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 args = a.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
@@ -132,6 +133,11 @@ else:  # format européen 520 × 110 mm
         x1 = L / 2 - 52
     # lettres de 75 mm, police serrée comme les vraies plaques
     texte(T, (x0 + x1) / 2, 0, -E, 75, x1 - x0 - 12, 0.8, encre)
+
+if args.cadre:  # contour de 7 mm sur le bord, posé sur la face
+    k, cm = 7, mat(args.cadre, rough=0.3)
+    for sx, sz, x, z in ((L, k, 0, H / 2 - k / 2), (L, k, 0, -H / 2 + k / 2), (k, H, -L / 2 + k / 2, 0), (k, H, L / 2 - k / 2, 0)):
+        boite(sx, sz, 0.6, x, z, -E, cm)
 
 bpy.ops.object.select_all(action="DESELECT")
 for o in pieces:
