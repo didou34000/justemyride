@@ -8,7 +8,7 @@ import {
 import { NextResponse } from "next/server";
 import { ALLOWED_TYPES, MAX_FILE_BYTES, storageMode } from "@/lib/storage";
 import { presignUpload } from "@/lib/store";
-import { authConfigured, userFromRequest } from "@/lib/clients";
+import { AuthDown, authConfigured, userFromRequest } from "@/lib/clients";
 
 /**
  * Autorise un envoi direct navigateur → Vercel Blob (pas de limite de taille de requête).
@@ -23,7 +23,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stockage non configuré" }, { status: 503 });
   }
 
-  if (authConfigured() && !(await userFromRequest(request))) {
+  const user = authConfigured() ? await userFromRequest(request).catch((e) => (e instanceof AuthDown ? e : Promise.reject(e))) : null;
+  if (user instanceof AuthDown) return NextResponse.json({ error: user.message }, { status: 503 });
+  if (authConfigured() && !user) {
     return NextResponse.json({ error: "Connecte-toi pour envoyer tes photos" }, { status: 401 });
   }
 

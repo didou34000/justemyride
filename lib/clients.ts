@@ -50,7 +50,19 @@ export const isJetable = (email: string) => JETABLES.has(email.split("@")[1]?.to
 
 export type User = { id: string; email: string };
 
-/** Client connecté d'après l'en-tête Authorization: Bearer <jeton Supabase>, vérifié auprès de Supabase. */
+export const AUTH_DOWN = "La connexion est momentanément indisponible. Réessaie dans quelques minutes.";
+
+/** Supabase ne répond pas (projet en pause, panne) : à distinguer d'un client simplement pas connecté. */
+export class AuthDown extends Error {
+  constructor() {
+    super(AUTH_DOWN);
+  }
+}
+
+/**
+ * Client connecté d'après l'en-tête Authorization: Bearer <jeton Supabase>, vérifié auprès de Supabase.
+ * null = pas connecté ; lève AuthDown si Supabase ne répond pas.
+ */
 export async function userFromRequest(request: Request): Promise<User | null> {
   if (!authConfigured()) return null;
   const token = request.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
@@ -59,7 +71,8 @@ export async function userFromRequest(request: Request): Promise<User | null> {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
     cache: "no-store",
   }).catch(() => null);
-  if (!res?.ok) return null;
+  if (!res || res.status >= 500) throw new AuthDown();
+  if (!res.ok) return null;
   const u = await res.json();
   // Code par e-mail et Google confirment tous les deux l'adresse.
   if (!u?.email || !(u.email_confirmed_at || u.confirmed_at)) return null;
